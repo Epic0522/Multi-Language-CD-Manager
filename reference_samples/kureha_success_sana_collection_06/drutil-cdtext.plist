@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>Properties</key>
+		<dict>
+			<key>DRCDTextCFStringEncodingKey</key>
+			<integer>133633</integer>
+			<key>DRCDTextCharacterCodeKey</key>
+			<integer>128</integer>
+			<key>DRCDTextCopyrightAssertedForNamesKey</key>
+			<integer>0</integer>
+			<key>DRCDTextCopyrightAssertedForSpecialMessagesKey</key>
+			<integer>0</integer>
+			<key>DRCDTextCopyrightAssertedForTitlesKey</key>
+			<integer>0</integer>
+			<key>DRCDTextLanguageKey</key>
+			<string>ja</string>
+			<key>DRCDTextNSStringEncodingKey</key>
+			<integer>2147617281</integer>
+		</dict>
+		<key>Tracks</key>
+		<array>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>Ｓａｎａ</string>
+				<key>DRCDTextSizeKey</key>
+				<data>
+				gAEKABIFAAAAAAAAAAAAAAAAAAMZAAAAAAAAAGkAAAAA
+				AAAA
+				</data>
+				<key>DRCDTextTitleKey</key>
+				<string>Ｓａｎａ　Ｃｏｌｌｅｃｔｉｏｎ　０６</string>
+			</dict>
+			<dict><key>DRCDTextPerformerKey</key><string>　</string><key>DRCDTextTitleKey</key><string>お困りメイビー</string></dict>
+			<dict><key>DRCDTextPerformerKey</key><string>　</string><key>DRCDTextTitleKey</key><string>ｂＡｄ　Ｇｒａｖｉｔｙ</string></dict>
+			<dict><key>DRCDTextPerformerKey</key><string>　</string><key>DRCDTextTitleKey</key><string>ＣＩＴＹ</string></dict>
+			<dict><key>DRCDTextPerformerKey</key><string>　</string><key>DRCDTextTitleKey</key><string>夕焼けと風邪薬</string></dict>
+			<dict><key>DRCDTextPerformerKey</key><string>　</string><key>DRCDTextTitleKey</key><string>選り好み</string></dict>
+			<dict><key>DRCDTextPerformerKey</key><string>　</string><key>DRCDTextTitleKey</key><string>踊りたがっている</string></dict>
+			<dict><key>DRCDTextPerformerKey</key><string>　</string><key>DRCDTextTitleKey</key><string>どうか届きませんように</string></dict>
+			<dict><key>DRCDTextPerformerKey</key><string>　</string><key>DRCDTextTitleKey</key><string>ひとりぽっち</string></dict>
+			<dict><key>DRCDTextPerformerKey</key><string>　</string><key>DRCDTextTitleKey</key><string>君の人格、最悪であれ</string></dict>
+			<dict><key>DRCDTextPerformerKey</key><string>　</string><key>DRCDTextTitleKey</key><string>青夏塗りの蝶々</string></dict>
+		</array>
+	</dict>
+</array>
+</plist>

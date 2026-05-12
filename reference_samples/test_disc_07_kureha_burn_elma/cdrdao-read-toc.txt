@@ -1,0 +1,68 @@
+0,0,0: _NEC DVD+-RW ND-6500A	Rev: 2.81
+CD-TEXT writing is supported.
+Using driver: Generic SCSI-3/MMC (raw writing) - Version 2.0 (options 0x0000)
+
+Reading toc data...
+ERROR: Cannot read disk toc.
+
+Track   Mode    Flags  Start                Length
+------------------------------------------------------------
+ 1      AUDIO   0      00:00:00(     0)     03:28:65( 15665)
+ 2      AUDIO   0      03:28:65( 15665)     01:35:47(  7172)
+ 3      AUDIO   0      05:04:37( 22837)     01:57:70(  8845)
+ 4      AUDIO   0      07:02:32( 31682)     04:02:64( 18214)
+ 5      AUDIO   0      11:05:21( 49896)     03:34:74( 16124)
+ 6      AUDIO   0      14:40:20( 66020)     03:44:62( 16862)
+ 7      AUDIO   0      18:25:07( 82882)     04:28:01( 20101)
+ 8      AUDIO   0      22:53:08(102983)     02:27:17( 11042)
+ 9      AUDIO   0      25:20:25(114025)     01:52:10(  8410)
+10      AUDIO   0      27:12:35(122435)     03:12:29( 14429)
+11      AUDIO   0      30:24:64(136864)     02:01:54(  9129)
+12      AUDIO   0      32:26:43(145993)     03:54:41( 17591)
+13      AUDIO   0      36:21:09(163584)     04:50:73( 21823)
+14      AUDIO   0      41:12:07(185407)     03:20:46( 15046)
+15      AUDIO   0      44:32:53(200453)     04:26:43( 19993)
+16      AUDIO   0      48:59:21(220446)     04:52:39( 21939)
+17      AUDIO   0      53:51:60(242385)     04:34:09( 20559)
+18      AUDIO   0      58:25:69(262944)     04:29:50( 20225)
+Leadout AUDIO   0      62:55:44(283169)
+
+Analyzing track 01 (AUDIO): start 00:00:00, length 03:28:65...
+ERROR: Cannot get ISRC code.
+Analyzing track 02 (AUDIO): start 03:28:65, length 01:35:47...
+ERROR: Cannot get ISRC code.
+Analyzing track 03 (AUDIO): start 05:04:37, length 01:57:70...
+ERROR: Cannot get ISRC code.
+Analyzing track 04 (AUDIO): start 07:02:32, length 04:02:64...
+ERROR: Cannot get ISRC code.
+Analyzing track 05 (AUDIO): start 11:05:21, length 03:34:74...
+ERROR: Cannot get ISRC code.
+Analyzing track 06 (AUDIO): start 14:40:20, length 03:44:62...
+ERROR: Cannot get ISRC code.
+Analyzing track 07 (AUDIO): start 18:25:07, length 04:28:01...
+ERROR: Cannot get ISRC code.
+Analyzing track 08 (AUDIO): start 22:53:08, length 02:27:17...
+ERROR: Cannot get ISRC code.
+Analyzing track 09 (AUDIO): start 25:20:25, length 01:52:10...
+ERROR: Cannot get ISRC code.
+Analyzing track 10 (AUDIO): start 27:12:35, length 03:12:29...
+ERROR: Cannot get ISRC code.
+Analyzing track 11 (AUDIO): start 30:24:64, length 02:01:54...
+ERROR: Cannot get ISRC code.
+Analyzing track 12 (AUDIO): start 32:26:43, length 03:54:41...
+ERROR: Cannot get ISRC code.
+Analyzing track 13 (AUDIO): start 36:21:09, length 04:50:73...
+ERROR: Cannot get ISRC code.
+Analyzing track 14 (AUDIO): start 41:12:07, length 03:20:46...
+ERROR: Cannot get ISRC code.
+Analyzing track 15 (AUDIO): start 44:32:53, length 04:26:43...
+ERROR: Cannot get ISRC code.
+Analyzing track 16 (AUDIO): start 48:59:21, length 04:52:39...
+ERROR: Cannot get ISRC code.
+Analyzing track 17 (AUDIO): start 53:51:60, length 04:34:09...
+ERROR: Cannot get ISRC code.
+Analyzing track 18 (AUDIO): start 58:25:69, length 04:29:50...
+ERROR: Cannot get ISRC code.
+ERROR: Cannot get catalog number.
+        	
+Reading of toc data finished successfully.

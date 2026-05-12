@@ -1,0 +1,102 @@
+{
+  "ok": true,
+  "language": "ja",
+  "characterCode": 128,
+  "cfStringEncoding": 133633,
+  "nsStringEncoding": 2147617281,
+  "albumTitle": "Ｅｌｍａ　＆　創作",
+  "albumPerformer": "ヨルシカ",
+  "trackCount": 18,
+  "tracks": [
+    {
+      "index": 1,
+      "title": "星遇９タートライン",
+      "performer": "　"
+    },
+    {
+      "index": 2,
+      "title": "車窓",
+      "performer": "　"
+    },
+    {
+      "index": 3,
+      "title": "創作",
+      "performer": "　"
+    },
+    {
+      "index": 4,
+      "title": "風を食む",
+      "performer": "　"
+    },
+    {
+      "index": 5,
+      "title": "海底、月明かり",
+      "performer": "　"
+    },
+    {
+      "index": 6,
+      "title": "湖の街",
+      "performer": "　"
+    },
+    {
+      "index": 7,
+      "title": "強盗と花束",
+      "performer": "　"
+    },
+    {
+      "index": 8,
+      "title": "森の教会",
+      "performer": "　"
+    },
+    {
+      "index": 9,
+      "title": "神様のダンス",
+      "performer": "　"
+    },
+    {
+      "index": 10,
+      "title": "声",
+      "performer": "　"
+    },
+    {
+      "index": 11,
+      "title": "夕凪、某、花惑い",
+      "performer": "　"
+    },
+    {
+      "index": 12,
+      "title": "心に穴が空いた",
+      "performer": "　"
+    },
+    {
+      "index": 13,
+      "title": "嘘月",
+      "performer": "　"
+    },
+    {
+      "index": 14,
+      "title": "憂一乗",
+      "performer": "　"
+    },
+    {
+      "index": 15,
+      "title": "雨晴るる",
+      "performer": "　"
+    },
+    {
+      "index": 16,
+      "title": "雨とカプチーノ",
+      "performer": "　"
+    },
+    {
+      "index": 17,
+      "title": "エイミー",
+      "performer": "　"
+    },
+    {
+      "index": 18,
+      "title": "ノーチラス",
+      "performer": "　"
+    }
+  ]
+}

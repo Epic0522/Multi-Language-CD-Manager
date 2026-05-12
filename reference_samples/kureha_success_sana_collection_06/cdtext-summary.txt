@@ -1,0 +1,15 @@
+language: ja
+characterCode: 128
+albumTitle: Ｓａｎａ　Ｃｏｌｌｅｃｔｉｏｎ　０６
+albumPerformer: Ｓａｎａ
+trackCount: 10
+T1: お困りメイビー | performer=　
+T2: ｂＡｄ　Ｇｒａｖｉｔｙ | performer=　
+T3: ＣＩＴＹ | performer=　
+T4: 夕焼けと風邪薬 | performer=　
+T5: 選り好み | performer=　
+T6: 踊りたがっている | performer=　
+T7: どうか届きませんように | performer=　
+T8: ひとりぽっち | performer=　
+T9: 君の人格、最悪であれ | performer=　
+T10: 青夏塗りの蝶々 | performer=　

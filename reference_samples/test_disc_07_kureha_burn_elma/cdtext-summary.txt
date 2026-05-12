@@ -1,0 +1,28 @@
+test_disc_07_kureha_burn_elma
+
+- Source: Kureha-authored burn using the disc 6 Elma track set
+- Intended role: control sample to separate "our burner/packing problem" from "this song set itself triggers W770J rejection"
+- Observed car result at capture time:
+  - W789J: not yet recorded here by tool, user should annotate separately if needed
+  - W770J: not yet recorded here by tool, user should annotate separately if needed
+
+cdrdao CD-TEXT view:
+- TITLE = Ｅｌｍａ　＆　創作
+- PERFORMER = ヨルシカ
+- SIZE_INFO = {128, 1, 18, 0, 18, 16, ..., 36, ..., 105, ...}
+
+Key structural position:
+- Compared with success sample:
+  - success = TITLE 18 / PERFORMER 5 / blockLast[0] 25
+  - this disc = TITLE 18 / PERFORMER 16 / blockLast[0] 36
+- Compared with disc 3:
+  - disc3 = TITLE 17 / PERFORMER 6 / blockLast[0] 25
+- Compared with disc 6 half-burn:
+  - disc6 = TITLE 16 / PERFORMER 6 / blockLast[0] 24
+
+Interpretation:
+- This disc preserves the same album title/artist strings as discs 3 and 6,
+  but its PERFORMER stream is far larger than any prior sample.
+- If this disc was authored with populated per-track performer fields, it is
+  strong evidence that track performer occupancy can dramatically reshape the
+  CD-TEXT block even when TITLE shape stays close to the successful 18-pack form.

@@ -1,0 +1,26 @@
+ok: true
+language: en
+characterCode: 0
+cfStringEncoding: 66049
+nsStringEncoding: 5
+albumTitle:  
+albumPerformer:  
+trackCount: 18
+track 01: title=  performer= 
+track 02: title=  performer= 
+track 03: title=  performer= 
+track 04: title=  performer= 
+track 05: title=  performer= 
+track 06: title=  performer= 
+track 07: title=  performer= 
+track 08: title=  performer= 
+track 09: title=  performer= 
+track 10: title=  performer= 
+track 11: title=  performer= 
+track 12: title=  performer= 
+track 13: title=  performer= 
+track 14: title=  performer= 
+track 15: title=  performer= 
+track 16: title=  performer= 
+track 17: title=  performer= 
+track 18: title=  performer= 

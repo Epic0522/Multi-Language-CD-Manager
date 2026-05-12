@@ -1,0 +1,23 @@
+cdrecord: Insufficient 'file read' privileges. You will not be able to open all needed devices.
+cdrecord: Insufficient 'file write' privileges. You will not be able to open all needed devices.
+cdrecord: Insufficient 'device' privileges. You may not be able to send all needed SCSI commands, this my cause various unexplainable problems.
+cdrecord: Insufficient 'memlock' privileges. You may get buffer underruns.
+cdrecord: Insufficient 'priocntl' privileges. You may get buffer underruns.
+cdrecord: Insufficient 'network' privileges. You will not be able to do remote SCSI.
+scsidev: '1,0,0'
+scsibus: 1 target: 0 lun: 0
+
+Warning, 'diskarbitrationd' is running and does not allow us to
+send SCSI commands to the drive.
+To allow us to send SCSI commands, do the following:
+Eject all removable media, then call as root:
+	kill -STOP `(ps -ef | grep diskarbitrationd | awk '{ print $2 }')`
+then re-run the failed command. To continue 'diskarbitrationd' call as root:
+	kill -CONT `(ps -ef | grep diskarbitrationd | awk '{ print $2 }')`
+
+cdrecord: No such file or directory. Unable to get exclusive access to device. Cannot open or use SCSI driver.
+cdrecord: For possible targets try 'cdrecord -scanbus'. Make sure you are root.
+cdrecord: For possible transport specifiers try 'cdrecord dev=help'.
+Cdrecord-ProDVD-ProBD-Clone 3.02a09 (--) Copyright (C) 1995-2016 Joerg Schilling
+Using remote (pipe) mode for interactive i/o.
+TOC Type: 1 = CD-ROM

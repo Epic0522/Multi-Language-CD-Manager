@@ -1,0 +1,23 @@
+language: ja
+characterCode: 128
+albumTitle: Ｅｌｍａ　＆　創作
+albumPerformer: ヨルシカ
+trackCount: 18
+T1: 星遇９タートライン | performer=　
+T2: 車窓 | performer=　
+T3: 創作 | performer=　
+T4: 風を食む | performer=　
+T5: 海底、月明かり | performer=　
+T6: 湖の街 | performer=　
+T7: 強盗と花束 | performer=　
+T8: 森の教会 | performer=　
+T9: 神様のダンス | performer=　
+T10: 声 | performer=　
+T11: 夕凪、某、花惑い | performer=　
+T12: 心に穴が空いた | performer=　
+T13: 嘘月 | performer=　
+T14: 憂一乗 | performer=　
+T15: 雨晴るる | performer=　
+T16: 雨とカプチーノ | performer=　
+T17: エイミー | performer=　
+T18: ノーチラス | performer=　

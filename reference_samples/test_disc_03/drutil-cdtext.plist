@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>Properties</key>
+		<dict>
+			<key>DRCDTextCFStringEncodingKey</key>
+			<integer>133633</integer>
+			<key>DRCDTextCharacterCodeKey</key>
+			<integer>128</integer>
+			<key>DRCDTextCopyrightAssertedForNamesKey</key>
+			<integer>0</integer>
+			<key>DRCDTextCopyrightAssertedForSpecialMessagesKey</key>
+			<integer>0</integer>
+			<key>DRCDTextCopyrightAssertedForTitlesKey</key>
+			<integer>0</integer>
+			<key>DRCDTextLanguageKey</key>
+			<string>ja</string>
+			<key>DRCDTextNSStringEncodingKey</key>
+			<integer>2147617281</integer>
+		</dict>
+		<key>Tracks</key>
+		<array>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>ヨルシカ</string>
+				<key>DRCDTextSizeKey</key>
+				<data>
+				gAESABEGAAAAAAAAAAAAAAAAAAMZAAAAAAAAAGkAAAAA
+				AAAA
+				</data>
+				<key>DRCDTextTitleKey</key>
+				<string>Ｅｌｍａ　＆　創作</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>星遇９タートライン</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>車窓</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>創作</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>風を食む</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>海底、月明かり</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>湖の街</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>強盗と花束</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>森の教会</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>神様のダンス</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>声</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>夕凪、某、花惑い</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>心に穴が空いた</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>嘘月</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>憂一乗</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>雨晴るる</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>雨とカプチーノ</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>エイミー</string>
+			</dict>
+			<dict>
+				<key>DRCDTextPerformerKey</key>
+				<string>　</string>
+				<key>DRCDTextTitleKey</key>
+				<string>ノーチラス</string>
+			</dict>
+		</array>
+	</dict>
+</array>
+</plist>

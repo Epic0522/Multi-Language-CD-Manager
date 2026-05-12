@@ -1,0 +1,7 @@
+ERROR: init: no object
+ERROR: init: no plugin
+ERROR: init: no mmc
+ERROR: init: no scsi
+ERROR: init: failed
+ERROR: Please use option '--device device', e.g. --device /dev/cdrom
+ERROR: Cannot setup device /dev/rdisk8.

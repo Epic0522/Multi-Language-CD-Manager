@@ -1,0 +1,17 @@
+0,0,0: _NEC DVD+-RW ND-6500A	Rev: 2.81
+CD-TEXT writing is supported.
+Using driver: Generic SCSI-3/MMC (raw writing) - Version 2.0 (options 0x0000)
+
+That data below may not reflect the real status of the inserted medium
+if a simulation run was performed before. Reload the medium in this case.
+
+CD-RW                : no
+Total Capacity       : n/a
+CD-R medium          : Plasmon Data systems Ltd.
+                       Short Strategy Type, e.g. Phthalocyanine
+Recording Speed      : n/a
+CD-R empty           : no
+Toc Type             : CD-DA or CD-ROM
+Sessions             : 1
+Last Track           : 18
+Appendable           : no

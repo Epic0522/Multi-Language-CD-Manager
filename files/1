@@ -1,0 +1,7 @@
+这一轮我把“能读到真实日文 CD-TEXT”继续往前推成了“可供后续刻录后端直接消费的结构化写入载荷”。
+
+现在最重要的变化有三块。第一，我给 CdTextField.h 补了显式的 trackNumber，以后不会再靠 Track 12 Title 这种标签字符串去猜字段归属。第二，我修正了 CdProject.cpp 和 Track.cpp 的状态判定：如果字段在盘上存在但用户把内容清空，现在会落成 EmptyByEdit，不再被误当成“正常的 0 字节值”；而盘上原本没有的字段仍然会保持 MissingOnDisc。这对你那种“有曲名、但没刻单曲作者”的盘尤其关键，语义会更干净。
+
+然后我新建了 CdTextWritePayloadBuilder.h 和 CdTextWritePayloadBuilder.cpp。它会把现在已有的线性 write plan 重新整理成“专辑字段 + 按轨分组字段”的写入载荷，顺手统计可写字段数、跳过字段数、总字节数。主窗口 MainWindow.cpp 也已经接上了这层，所以诊断面板里除了原来的编码校验和动作计划，现在还能直接看到后续刻录后端真正会吃到的载荷轮廓。
+
+这轮我已经重新编译并做了启动验证，当前 cmake --build build 通过，CDMANAGER_DISC_GATEWAY=sample ./build/cdmanager 也能正常起。你这边暂时不用接光驱，我下一步会继续把这个“写入载荷”往真正的刻录输入模型收紧，重点会放在字段分组、保留原始导入字节的策略，以及给后面接 libburn 留一个干净边界。
