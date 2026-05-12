@@ -1,6 +1,6 @@
 # MultiLanguageCDManager
 
-一个面向 Audio CD / CD-TEXT 研究与实验刻录的**跨平台**工具集。当前重点是**日文 CD-TEXT** 的导入、重建、对照分析，以及尽量复现已验证成功样本的刻录结构。
+一个面向 Audio CD / CD-TEXT 研究与实验刻录的**跨平台**工具集。当前重点是**日文 CD-TEXT** 的导入、重建、对照分析，以及持续改进刻录兼容性。
 
 项目目前包含两部分：
 
@@ -12,13 +12,12 @@
 - 项目目标是跨平台；当前仓库里的 GUI、设备接入和刻录实验主要先在 **macOS** 上实现与验证。
 - 已验证当前这套日文文本链路可以生成 **W789J 可识别** 的 CD-TEXT。
 - 仍在继续收敛与已知成功样本之间的低层差异，尤其是 `W770J` 的兼容性。
-- 仓库内保留了多张参考盘 / 对照盘抓取包，便于继续做 pack、`SIZE_INFO`、`block` 结构分析。
 
 如果你只想快速开始：
 
 1. 先按下面的编译步骤构建项目。
-2. 优先阅读 [`reference_samples/kureha_success_sana_collection_06/README.txt`](reference_samples/kureha_success_sana_collection_06/README.txt)。
-3. 用 `cdtext-diff` 跑一遍参考样本导出和对照命令。
+2. 先运行 `MultiLanguageCDManager`，确认 GUI 可以正常启动。
+3. 再运行 `ctest --test-dir build --output-on-failure`，确认当前构建通过回归测试。
 
 ## Features
 
@@ -27,9 +26,7 @@
 - Audio import and burn-source preparation
 - Japanese fullwidth normalization and MS-JIS encoding pipeline
 - CD-TEXT pack assembly and export
-- Reference-sample parsing and comparison
 - Experimental `cdrdao` / `cdrecord` burn backends
-- On-disk sample capture for regression and reverse-engineering work
 
 ## Requirements
 
@@ -66,6 +63,11 @@ Depending on the workflow you test, the app may call some of the following tools
 - `afconvert` / `afinfo`
 
 For the current Japanese CD-TEXT experiments on macOS, **`cdrdao` is the recommended backend**.
+
+`cdrdao` project links:
+
+- Source repository: [cdrdao/cdrdao](https://github.com/cdrdao/cdrdao)
+- Project homepage: [cdrdao.sourceforge.net](https://cdrdao.sourceforge.net/)
 
 ### Example dependency install on Homebrew
 
@@ -114,30 +116,22 @@ CDMANAGER_BURN_BACKEND=cdrdao CDMANAGER_CDRDAO_DEVICE='0,0,0' ./build/MultiLangu
 
 ### Command-line CD-TEXT tooling
 
-Export the current project shape from a reference sample:
+Show available commands:
 
 ```bash
-./build/cdtext-diff export-current \
-  --sample-dir reference_samples/kureha_success_sana_collection_06 \
-  --json /tmp/kureha-export.json
+./build/cdtext-diff --help
 ```
 
-Compare a reference sample with the exported result:
+Export the current project shape into a normalized JSON report:
 
 ```bash
-./build/cdtext-diff compare \
-  reference_samples/kureha_success_sana_collection_06 \
-  /tmp/kureha-export.json \
-  --left-format reference-sample \
-  --right-format packs-json
+./build/cdtext-diff export-current --json /tmp/cdtext-export.json
 ```
 
 Export a Sony-style lead-in blob (`18 * N + 1` bytes):
 
 ```bash
-./build/cdtext-diff export-current \
-  --sample-dir reference_samples/kureha_success_sana_collection_06 \
-  --sony-bin-out /tmp/kureha-sony.bin
+./build/cdtext-diff export-current --sony-bin-out /tmp/cdtext-leadin.bin
 ```
 
 ## Tests
@@ -150,12 +144,11 @@ ctest --test-dir build --output-on-failure
 
 The repository currently includes regression coverage for:
 
-- exact reference-sample comparison
 - exported artifact presence
 - Sony-style lead-in blob shape
 - project JSON preserving Track 1 title
 - exported pack roundtrip
-- DiscRecording acceptance checks for the captured success sample
+- DiscRecording acceptance checks on the current Apple-side validation path
 
 ## Recommended Workflow
 
@@ -163,35 +156,14 @@ For Japanese CD-TEXT work, the current safest order is:
 
 1. Prepare / inspect the project in `MultiLanguageCDManager`
 2. Export and compare with `cdtext-diff`
-3. Verify against the success sample in `reference_samples/kureha_success_sana_collection_06`
-4. Run a simulated burn first
-5. Only then run a real burn and immediately capture the disc back into `reference_samples/`
+3. Run a simulated burn first
+4. Only then run a real burn on disposable media
 
 ## Repository Layout
 
 - [`app/`](app): application source
 - [`cmake/`](cmake): helper CMake scripts and regression drivers
-- [`reference_samples/`](reference_samples): captured discs and comparison baselines
 - [`ARCHITECTURE.md`](ARCHITECTURE.md): layer overview
-- [`REVERSE_ENGINEERING_KUREHA_CD_TEXT.md`](REVERSE_ENGINEERING_KUREHA_CD_TEXT.md): reverse-engineering notes for the KUREHA toolchain
-
-## Reference Samples
-
-The most important baseline is:
-
-- [`reference_samples/kureha_success_sana_collection_06`](reference_samples/kureha_success_sana_collection_06)
-
-It is the current known-good captured sample used to evaluate pack layout and structure.
-
-Additional captured discs document intermediate and failing states, including:
-
-- `test_disc_03`
-- `test_disc_04`
-- `test_disc_05_failed_cdrecord_burn`
-- `test_disc_06_half_burn_w789_only`
-- `test_disc_07_kureha_burn_elma`
-
-These directories are intentionally kept in the repo because they are part of the reverse-engineering evidence chain.
 
 ## Notes
 

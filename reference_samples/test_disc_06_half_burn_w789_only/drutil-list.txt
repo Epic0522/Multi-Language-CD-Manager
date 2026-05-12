@@ -1,3 +1,0 @@
-   Vendor   Product           Rev   Bus       SupportLevel
-1  _NEC     DVD+-RW ND-6500A  2.81  USB       Vendor Supported
-

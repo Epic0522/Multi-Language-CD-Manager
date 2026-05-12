@@ -1,3 +1,8 @@
 build/
 .DS_Store
-
+.claude/
+reference_samples/
+REVERSE_ENGINEERING_KUREHA_CD_TEXT.md
+跨平台CD管理器计划.docx
+跨平台CD管理器计划.pages
+跨平台CD管理器计划.txt
