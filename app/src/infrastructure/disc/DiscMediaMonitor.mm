@@ -13,6 +13,7 @@ struct MonitorContext {
     DASessionRef session {nullptr};
     DiscMediaMonitor* owner {nullptr};
     bool active {false};
+    CFArrayRef watchedKeys {nullptr};
 };
 
 bool descriptionBoolValue(CFDictionaryRef description, CFStringRef key) {
@@ -34,11 +35,11 @@ bool shouldEmitForDisk(DADiskRef disk) {
         return false;
     }
 
-    // 只关心“整张、可弹出的介质”，避免把桌面卷、分区、挂载点变化也算进去。
+    // 只关心“整张介质”，避免把桌面卷、分区、挂载点变化也算进去。
+    // 有些 USB 光驱在换盘时 ejectable 标记并不稳定，只看 whole 更稳。
     const bool whole = descriptionBoolValue(description, kDADiskDescriptionMediaWholeKey);
-    const bool ejectable = descriptionBoolValue(description, kDADiskDescriptionMediaEjectableKey);
     CFRelease(description);
-    return whole && ejectable;
+    return whole;
 }
 
 void emitChange(DiscMediaMonitor* owner) {
@@ -69,6 +70,15 @@ void diskDisappearedCallback(DADiskRef disk, void* context) {
     emitChange(monitor);
 }
 
+void diskDescriptionChangedCallback(DADiskRef disk, CFArrayRef keys, void* context) {
+    Q_UNUSED(keys)
+    if (!shouldEmitForDisk(disk)) {
+        return;
+    }
+    auto* monitor = static_cast<DiscMediaMonitor*>(context);
+    emitChange(monitor);
+}
+
 }  // namespace
 
 DiscMediaMonitor::DiscMediaMonitor(QObject* parent)
@@ -92,8 +102,30 @@ void DiscMediaMonitor::start() {
         return;
     }
 
+    const void* watchedKeys[] = {
+        kDADiskDescriptionMediaWholeKey,
+        kDADiskDescriptionMediaEjectableKey,
+        kDADiskDescriptionMediaWritableKey,
+        kDADiskDescriptionMediaLeafKey,
+        kDADiskDescriptionVolumePathKey,
+        kDADiskDescriptionVolumeKindKey,
+    };
+    context->watchedKeys = CFArrayCreate(
+        kCFAllocatorDefault,
+        watchedKeys,
+        sizeof(watchedKeys) / sizeof(watchedKeys[0]),
+        &kCFTypeArrayCallBacks
+    );
+
     DARegisterDiskAppearedCallback(context->session, nullptr, diskAppearedCallback, this);
     DARegisterDiskDisappearedCallback(context->session, nullptr, diskDisappearedCallback, this);
+    DARegisterDiskDescriptionChangedCallback(
+        context->session,
+        nullptr,
+        context->watchedKeys,
+        diskDescriptionChangedCallback,
+        this
+    );
     DASessionScheduleWithRunLoop(context->session, CFRunLoopGetMain(), kCFRunLoopCommonModes);
     context->active = true;
     m_implHandle = context;
@@ -108,7 +140,15 @@ void DiscMediaMonitor::stop() {
     if (context->session != nullptr) {
         DAUnregisterCallback(context->session, reinterpret_cast<void*>(diskAppearedCallback), this);
         DAUnregisterCallback(context->session, reinterpret_cast<void*>(diskDisappearedCallback), this);
+        DAUnregisterCallback(
+            context->session,
+            reinterpret_cast<void*>(diskDescriptionChangedCallback),
+            this
+        );
         DASessionUnscheduleFromRunLoop(context->session, CFRunLoopGetMain(), kCFRunLoopCommonModes);
+    }
+    if (context->watchedKeys != nullptr) {
+        CFRelease(context->watchedKeys);
     }
     if (context->session != nullptr) {
         CFRelease(context->session);

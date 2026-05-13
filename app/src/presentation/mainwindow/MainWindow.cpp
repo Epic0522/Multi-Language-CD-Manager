@@ -35,6 +35,7 @@
 #include "cdmanager/presentation/editor/AlbumDetailsWidget.h"
 #include "cdmanager/presentation/editor/BurnWidget.h"
 #include "cdmanager/presentation/editor/CdTextPreviewWidget.h"
+#include "cdmanager/presentation/editor/DiscAnalysisWidget.h"
 #include "cdmanager/presentation/editor/ExportWidget.h"
 #include "cdmanager/presentation/editor/TrackTableWidget.h"
 #include "cdmanager/presentation/ui/MacVisualEffectHelper.h"
@@ -551,7 +552,7 @@ MainWindow::MainWindow(QWidget* parent)
     m_language = cdmanager::presentation::ui::detectInitialLanguage();
     m_themeMode = cdmanager::presentation::ui::detectInitialThemeMode();
     m_darkMode = cdmanager::presentation::ui::resolveDarkMode(m_themeMode);
-    statusBar()->showMessage(QStringLiteral("Reading TOC..."));
+    statusBar()->showMessage(QStringLiteral("正在读取光碟目录信息…"));
 
     m_initialImportResult = m_discImportService.initialImport();
     m_project = m_initialImportResult.project;
@@ -559,7 +560,7 @@ MainWindow::MainWindow(QWidget* parent)
     buildUi();
 
     statusBar()->showMessage(
-        QStringLiteral("Ready — %1 tracks").arg(m_project.tracks.size()), 3000
+        QStringLiteral("界面已就绪 — 当前音轨数：%1").arg(m_project.tracks.size()), 3000
     );
 
     const auto drives = m_discImportService.availableDrives();
@@ -582,6 +583,10 @@ MainWindow::MainWindow(QWidget* parent)
     );
 
     refreshProjectView();
+    if (m_initialImportResult.status == cdmanager::application::import::DiscImportStatus::Success
+        && m_discAnalysisWidget != nullptr) {
+        m_discAnalysisWidget->analyzeCurrentDisc();
+    }
 
     connect(
         QGuiApplication::styleHints(),
@@ -600,6 +605,7 @@ void MainWindow::buildUi() {
     resize(1100, 700);
 
     auto* central = new QWidget(this);
+    central->setObjectName(QStringLiteral("mainSurface"));
     auto* rootLayout = new QVBoxLayout(central);
     rootLayout->setContentsMargins(8, 8, 8, 8);
 
@@ -702,6 +708,31 @@ void MainWindow::buildUi() {
 
     m_tabWidget->addTab(consoleTab, QString());
 
+    // ---- Analysis tab ----
+    m_discAnalysisWidget = new cdmanager::presentation::editor::DiscAnalysisWidget(this);
+    m_tabWidget->addTab(m_discAnalysisWidget, QString());
+    connect(
+        m_discAnalysisWidget,
+        &cdmanager::presentation::editor::DiscAnalysisWidget::analysisStarted,
+        this,
+        [this]() {
+            statusBar()->showMessage(QStringLiteral("正在分析光碟结构与音轨信息…"));
+        }
+    );
+    connect(
+        m_discAnalysisWidget,
+        &cdmanager::presentation::editor::DiscAnalysisWidget::analysisFinished,
+        this,
+        [this](bool healthy) {
+            statusBar()->showMessage(
+                healthy
+                    ? QStringLiteral("光碟分析完成：未见明显结构异常。")
+                    : QStringLiteral("光碟分析完成：检测到可疑结构特征。"),
+                5000
+            );
+        }
+    );
+
     // ---- Export tab ----
     m_exportWidget = new cdmanager::presentation::editor::ExportWidget(this);
     m_tabWidget->addTab(m_exportWidget, QString());
@@ -734,12 +765,18 @@ void MainWindow::buildUi() {
             });
     connect(m_ejectButton, &QPushButton::clicked,
             this, [this]() {
+                statusBar()->showMessage(QStringLiteral("正在弹出光碟…"));
                 m_playbackService.stop();
                 const cdmanager::infrastructure::disc::DrutilCommandRunner runner;
                 const auto drives = m_discImportService.availableDrives();
                 if (!drives.isEmpty()) {
                     const QString idx = drives.first().deviceId.mid(QStringLiteral("drutil-index://").size());
-                    runner.run({QStringLiteral("-drive"), idx, QStringLiteral("eject")});
+                    const auto ejectResult = runner.run({QStringLiteral("-drive"), idx, QStringLiteral("eject")});
+                    if (ejectResult.ok) {
+                        statusBar()->showMessage(QStringLiteral("光碟弹出指令已发送，等待设备反馈…"), 3000);
+                    } else {
+                        statusBar()->showMessage(QStringLiteral("弹出光碟失败：设备未响应。"), 5000);
+                    }
                 }
                 m_discKeepAlive.stop();
             });
@@ -1497,6 +1534,10 @@ void MainWindow::refreshProjectView() {
     m_playbackService.setTrackList(trackNumbers);
 
     const QString devPath = cdmanager::infrastructure::audio::AudioCdReader::defaultDevicePath();
+    if (m_discAnalysisWidget != nullptr) {
+        m_discAnalysisWidget->setCurrentDriveId(m_lastDeviceId);
+        m_discAnalysisWidget->setReferenceProject(m_project);
+    }
     m_exportWidget->setProject(m_project, devPath);
     const bool preserveBurnDraft =
         m_burnWidget->hasUserAuthoredContent() &&
@@ -1679,8 +1720,8 @@ QString MainWindow::buildFeaturesText() const {
 
 void MainWindow::applyCurrentTheme() {
     m_darkMode = cdmanager::presentation::ui::resolveDarkMode(m_themeMode);
-    qApp->setPalette(QPalette());
-    qApp->setStyleSheet(QString());
+    qApp->setPalette(cdmanager::presentation::ui::buildApplicationPalette(m_darkMode));
+    qApp->setStyleSheet(cdmanager::presentation::ui::buildApplicationStyleSheet(m_darkMode));
 }
 
 void MainWindow::retranslateUi() {
@@ -1688,8 +1729,9 @@ void MainWindow::retranslateUi() {
     if (m_tabWidget != nullptr) {
         m_tabWidget->setTabText(0, uiText(u"播放器", u"Player"));
         m_tabWidget->setTabText(1, uiText(u"控制台", u"Console"));
-        m_tabWidget->setTabText(2, uiText(u"导出", u"Export"));
-        m_tabWidget->setTabText(3, uiText(u"刻录", u"Burn"));
+        m_tabWidget->setTabText(2, uiText(u"分析", u"Analyze"));
+        m_tabWidget->setTabText(3, uiText(u"导出", u"Export"));
+        m_tabWidget->setTabText(4, uiText(u"刻录", u"Burn"));
     }
     if (m_albumDetailsWidget != nullptr) {
         m_albumDetailsWidget->setLanguage(m_language);
@@ -1699,6 +1741,9 @@ void MainWindow::retranslateUi() {
     }
     if (m_cdTextPreviewWidget != nullptr) {
         m_cdTextPreviewWidget->setLanguage(m_language);
+    }
+    if (m_discAnalysisWidget != nullptr) {
+        m_discAnalysisWidget->setLanguage(m_language);
     }
     if (m_exportWidget != nullptr) {
         m_exportWidget->setLanguage(m_language);
@@ -1846,16 +1891,18 @@ void MainWindow::refreshFromCurrentDriveState() {
             QString()
         };
         refreshProjectView();
-        statusBar()->showMessage(QStringLiteral("Drive removed."), 3000);
+        statusBar()->showMessage(QStringLiteral("光驱已移除或当前不可用。"), 3000);
         return;
     }
 
     m_lastDeviceId = drives.first().deviceId;
+    statusBar()->showMessage(QStringLiteral("正在读取光碟状态…"));
 
     const QString idx = m_lastDeviceId.mid(QStringLiteral("drutil-index://").size());
     const cdmanager::infrastructure::disc::DrutilCommandRunner runner;
     const auto statusResult = runner.run({QStringLiteral("-drive"), idx, QStringLiteral("status")});
     if (!statusResult.ok) {
+        statusBar()->showMessage(QStringLiteral("读取光碟状态失败：无法取得设备反馈。"), 4000);
         return;
     }
 
@@ -1866,24 +1913,32 @@ void MainWindow::refreshFromCurrentDriveState() {
     m_lastMediaStatusSignature = currentSignature;
 
     m_playbackService.stop();
+    statusBar()->showMessage(QStringLiteral("正在导入光碟目录与文本信息…"));
     m_initialImportResult = m_discImportService.initialImport();
     m_project = m_initialImportResult.project;
     m_lastTrackCount = m_project.tracks.size();
     refreshProjectView();
+    m_pendingAutoDiscAnalysis = false;
 
     switch (m_initialImportResult.status) {
         case cdmanager::application::import::DiscImportStatus::Success:
-            statusBar()->showMessage(QStringLiteral("Disc inserted — library refreshed."), 3000);
+            statusBar()->showMessage(QStringLiteral("已读取光碟内容，正在刷新媒体资料…"), 3000);
+            m_pendingAutoDiscAnalysis = true;
             break;
         case cdmanager::application::import::DiscImportStatus::NoMediaLoaded:
-            statusBar()->showMessage(QStringLiteral("Disc ejected."), 3000);
+            statusBar()->showMessage(QStringLiteral("光碟已弹出。"), 3000);
             break;
         case cdmanager::application::import::DiscImportStatus::BlankWritableMedia:
-            statusBar()->showMessage(QStringLiteral("Blank writable disc inserted."), 3000);
+            statusBar()->showMessage(QStringLiteral("已装入空白可写光碟。"), 3000);
             break;
         default:
             statusBar()->showMessage(m_initialImportResult.message, 3000);
             break;
+    }
+
+    if (m_pendingAutoDiscAnalysis && m_discAnalysisWidget != nullptr) {
+        m_pendingAutoDiscAnalysis = false;
+        m_discAnalysisWidget->analyzeCurrentDisc();
     }
 }
 

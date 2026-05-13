@@ -120,6 +120,7 @@ target_compile_options(cdmanager_cdtext_core
 
 qt_add_executable(cdmanager
     app/include/cdmanager/application/CdTextPreviewBuilder.h
+    app/include/cdmanager/application/import/DiscAnalysisService.h
     app/include/cdmanager/application/import/DiscImportResult.h
     app/include/cdmanager/application/import/DiscImportService.h
     app/include/cdmanager/application/PlaybackService.h
@@ -143,6 +144,7 @@ qt_add_executable(cdmanager
     app/include/cdmanager/infrastructure/disc/SystemDiscGateway.h
     app/include/cdmanager/presentation/editor/AlbumDetailsWidget.h
     app/include/cdmanager/presentation/editor/CdTextPreviewWidget.h
+    app/include/cdmanager/presentation/editor/DiscAnalysisWidget.h
     app/include/cdmanager/presentation/editor/BurnWidget.h
     app/include/cdmanager/presentation/editor/ExportWidget.h
     app/include/cdmanager/presentation/editor/TrackTableWidget.h
@@ -155,6 +157,7 @@ qt_add_executable(cdmanager
     app/include/cdmanager/tools/cdtextdiff/CurrentProjectPackExporter.h
     app/src/main.cpp
     app/src/application/CdTextPreviewBuilder.cpp
+    app/src/application/import/DiscAnalysisService.cpp
     app/src/application/import/DiscImportService.cpp
     app/src/application/PlaybackService.cpp
     app/src/application/ExportService.cpp
@@ -178,6 +181,7 @@ qt_add_executable(cdmanager
     app/src/infrastructure/disc/SystemDiscGateway.cpp
     app/src/presentation/editor/AlbumDetailsWidget.cpp
     app/src/presentation/editor/CdTextPreviewWidget.cpp
+    app/src/presentation/editor/DiscAnalysisWidget.cpp
     app/src/presentation/editor/BurnWidget.cpp
     app/src/presentation/editor/ExportWidget.cpp
     app/src/presentation/editor/TrackTableWidget.cpp
@@ -337,6 +341,14 @@ add_test(
         -DCDTEXT_DIFF_BIN=$<TARGET_FILE:cdtext-diff>
         -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cdtext_project_json_preserves_track1_title.cmake
+)
+
+add_test(
+    NAME cdtext-project-json-empty-track-artist-uses-empty-string
+    COMMAND ${CMAKE_COMMAND}
+        -DCDTEXT_DIFF_BIN=$<TARGET_FILE:cdtext-diff>
+        -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cdtext_project_json_empty_track_artist_uses_empty_string.cmake
 )
 
 if(APPLE)

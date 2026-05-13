@@ -66,18 +66,8 @@ QString cdrdaoFieldValueLiteral(const cdmanager::application::PreparedCdTextFiel
 
 QString cdrdaoEmptyFieldLiteral(cdmanager::domain::cdtext::CdTextLanguage language,
                                 cdmanager::domain::cdtext::CdTextFieldId fieldId) {
-    if (language == cdmanager::domain::cdtext::CdTextLanguage::Japanese) {
-        // 吴叶样本里，启用了但未填写的“单曲艺术家”不是裸空串，而是全角空格占位。
-        // 车机很可能依赖这种“字段存在且结构完整”的写法来稳定识别。
-        if (fieldId == cdmanager::domain::cdtext::CdTextFieldId::TrackArtist) {
-            const cdmanager::infrastructure::encoding::MsJisCodec codec;
-            const auto encoded = codec.encode(QStringLiteral("　"));
-            if (encoded.ok) {
-                return QStringLiteral("\"　\"");
-            }
-        }
-        return QStringLiteral("\"\"");
-    }
+    Q_UNUSED(language);
+    Q_UNUSED(fieldId);
     return QStringLiteral("\"\"");
 }
 

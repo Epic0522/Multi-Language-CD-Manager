@@ -34,6 +34,7 @@ namespace cdmanager::presentation::editor {
 class AlbumDetailsWidget;
 class BurnWidget;
 class CdTextPreviewWidget;
+class DiscAnalysisWidget;
 class ExportWidget;
 class TrackTableWidget;
 }
@@ -77,6 +78,7 @@ private:
     cdmanager::presentation::editor::AlbumDetailsWidget* m_albumDetailsWidget {nullptr};
     cdmanager::presentation::editor::CdTextPreviewWidget* m_cdTextPreviewWidget {nullptr};
     cdmanager::presentation::editor::TrackTableWidget* m_trackTableWidget {nullptr};
+    cdmanager::presentation::editor::DiscAnalysisWidget* m_discAnalysisWidget {nullptr};
     cdmanager::presentation::editor::ExportWidget* m_exportWidget {nullptr};
     cdmanager::presentation::editor::BurnWidget* m_burnWidget {nullptr};
     QPlainTextEdit* m_validationDetails {nullptr};
@@ -97,6 +99,7 @@ private:
     QTimer* m_mediaRefreshDebounceTimer {nullptr};
     QTimer* m_mediaRefreshCooldownTimer {nullptr};
     bool m_mediaRefreshCoolingDown {false};
+    bool m_pendingAutoDiscAnalysis {false};
     int m_lastTrackCount = 0;
     QString m_lastDeviceId;
     QString m_lastMediaStatusSignature;

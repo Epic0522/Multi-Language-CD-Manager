@@ -31,6 +31,6 @@ if(NOT EXISTS "${EXPORT_SONY_BIN}")
 endif()
 
 file(SIZE "${EXPORT_SONY_BIN}" export_sony_bin_size)
-if(NOT export_sony_bin_size EQUAL 469)
-    message(FATAL_ERROR "Expected Sony BIN artifact size 469, got ${export_sony_bin_size}")
+if(NOT export_sony_bin_size EQUAL 433)
+    message(FATAL_ERROR "Expected Sony BIN artifact size 433, got ${export_sony_bin_size}")
 endif()

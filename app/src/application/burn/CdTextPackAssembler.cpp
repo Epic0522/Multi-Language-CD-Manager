@@ -66,6 +66,7 @@ struct CollectedField {
     cdmanager::domain::cdtext::CdTextFieldId id {};
     std::optional<int> trackNumber;
     QByteArray encodedBytes;
+    bool emitWhenEmpty {false};
 };
 
 QVector<CollectedField> collectWritableFields(
@@ -80,6 +81,7 @@ QVector<CollectedField> collectWritableFields(
                 f.preparedField.field.id,
                 f.preparedField.field.trackNumber,
                 f.preparedField.encodedBytes,
+                false,
             });
         }
     }
@@ -91,6 +93,7 @@ QVector<CollectedField> collectWritableFields(
                     f.preparedField.field.id,
                     f.preparedField.field.trackNumber,
                     f.preparedField.encodedBytes,
+                    false,
                 });
                 if (f.preparedField.field.id == cdmanager::domain::cdtext::CdTextFieldId::TrackArtist) {
                     hasWritableTrackArtist = true;
@@ -107,7 +110,8 @@ QVector<CollectedField> collectWritableFields(
                 result.append({
                     skipped.preparedField.field.id,
                     skipped.preparedField.field.trackNumber,
-                    QByteArray::fromHex("8140"),
+                    QByteArray(),
+                    true,
                 });
                 break;
             }
@@ -158,7 +162,7 @@ BlockAssembly buildBlock(const QVector<CollectedField>& fields,
 
         for (const auto& cf : fields) {
             const QByteArray& bytes = cf.encodedBytes;
-            if (bytes.isEmpty() || packTypeForFieldId(cf.id) != expectedPackType) {
+            if ((!cf.emitWhenEmpty && bytes.isEmpty()) || packTypeForFieldId(cf.id) != expectedPackType) {
                 continue;
             }
 

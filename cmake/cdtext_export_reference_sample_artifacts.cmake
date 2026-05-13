@@ -33,8 +33,8 @@ if(NOT EXISTS "${EXPORT_CDT}")
 endif()
 
 file(SIZE "${EXPORT_CDT}" export_cdt_size)
-if(NOT export_cdt_size EQUAL 468)
-    message(FATAL_ERROR "Expected CDT artifact size 468, got ${export_cdt_size}")
+if(NOT export_cdt_size EQUAL 432)
+    message(FATAL_ERROR "Expected CDT artifact size 432, got ${export_cdt_size}")
 endif()
 
 if(NOT EXISTS "${EXPORT_JSON}")
