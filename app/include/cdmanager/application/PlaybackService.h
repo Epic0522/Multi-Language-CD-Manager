@@ -64,6 +64,7 @@ signals:
 private slots:
     void onReaderFinished();
     void onReaderError(const QString& message);
+    void onOutputError(const QString& message);
     void onOutputFinished();
     void onPositionTick();
 

@@ -34,11 +34,27 @@ QString msfFromSeconds(int totalSeconds) {
 QString probeSummaryText(const cdmanager::application::import::DiscAnalysisTrackProbe& probe) {
     QStringList parts;
     for (const auto& point : probe.points) {
+        if (point.inferred) {
+            if (point.error == QStringLiteral("tail-unwritten")) {
+                parts.append(QStringLiteral("尾段疑似未写入"));
+            } else if (point.error == QStringLiteral("tail-overlap")) {
+                parts.append(QStringLiteral("尾段疑似截断"));
+            } else {
+                parts.append(QStringLiteral("结构推定正常"));
+            }
+            continue;
+        }
         QString marker;
         if (!point.attempted) {
-            marker = QStringLiteral("未检");
+            marker = QStringLiteral("未执行");
+        } else if (point.error == QStringLiteral("tail-overlap")) {
+            marker = QStringLiteral("起始区疑似截断");
+        } else if (point.error == QStringLiteral("tail-unwritten")) {
+            marker = QStringLiteral("起始区疑似未写入");
+        } else if (point.error == QStringLiteral("probe-soft-fail")) {
+            marker = QStringLiteral("边界读样不稳");
         } else if (!point.ok) {
-            marker = QStringLiteral("失败");
+            marker = QStringLiteral("读取失败");
         } else if (point.allZero) {
             marker = QStringLiteral("零填充");
         } else {
@@ -85,37 +101,70 @@ public:
         update();
     }
 
+    void setRegionMarkers(const QVector<cdmanager::application::import::DiscAnalysisRegionMarker>& markers) {
+        m_regionMarkers = markers;
+        update();
+    }
+
 protected:
     void paintEvent(QPaintEvent* event) override {
         QWidget::paintEvent(event);
 
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
-        const QRectF bounds = rect().adjusted(18, 16, -18, -16);
-        const qreal ellipseWidth = qMin(bounds.width(), bounds.height() * 2.05);
-        const qreal ellipseHeight = ellipseWidth * 0.44;
-        const QRectF ringRect(
+        const QRectF bounds = rect().adjusted(10, 22, -10, -20);
+        const qreal ellipseWidth = qMin(bounds.width(), bounds.height() * 3.45);
+        const qreal ellipseHeight = ellipseWidth * 0.33;
+        const QRectF outerRect(
             bounds.center().x() - ellipseWidth / 2.0,
             bounds.center().y() - ellipseHeight / 2.0,
             ellipseWidth,
             ellipseHeight
         );
-        const qreal ringWidth = qMax<qreal>(10.0, ellipseHeight * 0.26);
+        const qreal innerInsetX = outerRect.width() * 0.23;
+        const qreal innerInsetY = outerRect.height() * 0.27;
+        const QRectF innerRect = outerRect.adjusted(innerInsetX, innerInsetY, -innerInsetX, -innerInsetY);
 
-        painter.setBrush(Qt::NoBrush);
-        painter.setPen(QPen(QColor(187, 238, 243, 120), ringWidth, Qt::SolidLine, Qt::RoundCap));
-        painter.drawArc(ringRect, 0, 360 * 16);
+        auto donutPathForSpan = [&](double startRatio, double endRatio) {
+            const double startDeg = 90.0 - 360.0 * startRatio;
+            const double spanDeg = -360.0 * (endRatio - startRatio);
+            QPainterPath path;
+            path.arcMoveTo(outerRect, startDeg);
+            path.arcTo(outerRect, startDeg, spanDeg);
+            path.arcTo(innerRect, startDeg + spanDeg, -spanDeg);
+            path.closeSubpath();
+            return path;
+        };
 
-        const int spanAngle = static_cast<int>(-360.0 * 16.0 * m_usageRatio);
-        painter.setPen(QPen(usageRingColor(m_usageRatio), ringWidth, Qt::SolidLine, Qt::RoundCap));
-        painter.drawArc(ringRect, 90 * 16, spanAngle);
+        QPainterPath basePath;
+        basePath.addEllipse(outerRect);
+        QPainterPath holePath;
+        holePath.addEllipse(innerRect);
+        basePath = basePath.subtracted(holePath);
 
-        painter.setPen(QPen(QColor(255, 255, 255, 210), 1.2));
-        painter.drawEllipse(ringRect);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(108, 231, 238));
+        painter.drawPath(basePath);
+
+        if (m_usageRatio > 0.0) {
+            painter.setBrush(usageRingColor(m_usageRatio));
+            painter.drawPath(donutPathForSpan(0.0, m_usageRatio));
+        }
+
+        painter.setBrush(QColor(244, 194, 214, 190));
+        for (const auto& marker : m_regionMarkers) {
+            const double start = qBound(0.0, marker.startRatio, 1.0);
+            const double end = qBound(0.0, marker.endRatio, 1.0);
+            if (end <= start) {
+                continue;
+            }
+            painter.drawPath(donutPathForSpan(start, end));
+        }
     }
 
 private:
     double m_usageRatio {0.0};
+    QVector<cdmanager::application::import::DiscAnalysisRegionMarker> m_regionMarkers;
 };
 
 }  // namespace
@@ -258,10 +307,15 @@ DiscAnalysisWidget::DiscAnalysisWidget(QWidget* parent)
             [this]() {
                 m_analyzeButton->setEnabled(true);
                 applyResult(m_analysisWatcher.result());
-                emit analysisFinished(m_analysisWatcher.result().looksHealthy);
+                emit analysisFinished(
+                    m_analysisWatcher.result().looksHealthy,
+                    m_analysisWatcher.result().performedDeepAnalysis
+                );
             });
 
-    connect(m_analyzeButton, &QPushButton::clicked, this, &DiscAnalysisWidget::analyzeCurrentDisc);
+    connect(m_analyzeButton, &QPushButton::clicked, this, [this]() {
+        analyzeCurrentDisc(cdmanager::application::import::DiscAnalysisDepth::Deep);
+    });
 
     connect(m_exportJsonButton, &QPushButton::clicked, this, [this]() {
         const QString path = QFileDialog::getSaveFileName(
@@ -302,7 +356,7 @@ void DiscAnalysisWidget::setReferenceProject(const cdmanager::domain::project::C
     m_referenceProject = project;
 }
 
-void DiscAnalysisWidget::analyzeCurrentDisc() {
+void DiscAnalysisWidget::analyzeCurrentDisc(cdmanager::application::import::DiscAnalysisDepth depth) {
     if (m_analysisWatcher.isRunning()) {
         return;
     }
@@ -326,10 +380,15 @@ void DiscAnalysisWidget::analyzeCurrentDisc() {
     m_trackTree->clear();
     m_detailsEdit->clear();
     static_cast<UsageRingWidget*>(m_usageRingWidget)->setUsageRatio(0.0);
+    static_cast<UsageRingWidget*>(m_usageRingWidget)->setRegionMarkers({});
     emit analysisStarted();
-    m_analysisWatcher.setFuture(QtConcurrent::run([service = m_service, driveId = m_currentDriveId]() {
-        return service.analyzeLiveDisc(driveId);
+    m_analysisWatcher.setFuture(QtConcurrent::run([service = m_service, driveId = m_currentDriveId, depth]() {
+        return service.analyzeLiveDisc(driveId, depth);
     }));
+}
+
+const cdmanager::application::import::DiscAnalysisResult& DiscAnalysisWidget::lastResult() const {
+    return m_lastResult;
 }
 
 void DiscAnalysisWidget::applyResult(const cdmanager::application::import::DiscAnalysisResult& result) {
@@ -338,8 +397,8 @@ void DiscAnalysisWidget::applyResult(const cdmanager::application::import::DiscA
 
     m_statusLabel->setText(
         result.looksHealthy
-            ? cdmanager::presentation::ui::text(m_language, u"分析状态：未检测到明确异常。", u"Analysis status: no explicit anomaly detected.")
-            : cdmanager::presentation::ui::text(m_language, u"分析状态：检测到异常线索。", u"Analysis status: anomaly indicators detected.")
+            ? cdmanager::presentation::ui::text(m_language, u"分析状态：未检出明确异常。", u"Analysis status: no explicit anomaly detected.")
+            : cdmanager::presentation::ui::text(m_language, u"分析状态：检出异常结构特征。", u"Analysis status: abnormal structural indicators detected.")
     );
 
     int totalSeconds = 0;
@@ -354,8 +413,12 @@ void DiscAnalysisWidget::applyResult(const cdmanager::application::import::DiscA
     m_summaryLabel->setText(
         cdmanager::presentation::ui::text(
             m_language,
-            u"已完成盘片结构采样，可结合目录信息、音频时长与抽样结果判断盘片是否存在中断写入或后段缺失。",
-            u"Disc structure sampling is complete. Combine TOC, runtime, and audio sampling results to determine whether the disc contains interrupted writes or missing later regions."
+            result.performedDeepAnalysis
+                ? u"已完成扩展结构分析。当前结果综合了目录布局、容量矛盾和异常区段推定，可用于判断盘片是否存在中断写入或程序区尾段缺失。"
+                : u"已完成基础结构分析。当前结果汇总了目录布局、文本读取状态与盘片容量信息。",
+            result.performedDeepAnalysis
+                ? u"Extended structural analysis is complete. The current result combines TOC geometry, contradictory capacity metadata, and inferred abnormal ranges."
+                : u"Baseline structural analysis is complete. The current result summarizes TOC geometry, CD-TEXT readability, and disc capacity metadata."
         )
     );
 
@@ -381,8 +444,8 @@ void DiscAnalysisWidget::applyResult(const cdmanager::application::import::DiscA
     m_cdTextValueLabel->setText(cdTextStatus);
     m_verdictLabel->setText(
         result.looksHealthy
-            ? cdmanager::presentation::ui::text(m_language, u"结构判定：盘片结构特征基本完整，可作为常规音频光盘处理。", u"Structural assessment: the disc appears structurally complete and may be handled as a standard audio disc.")
-            : cdmanager::presentation::ui::text(m_language, u"结构判定：盘片存在异常结构特征，建议优先排查中断写入、尾段缺失或文本读取失配。", u"Structural assessment: abnormal disc traits detected; prioritize investigation of interrupted writing, missing tail regions, or CD-TEXT read mismatches.")
+            ? cdmanager::presentation::ui::text(m_language, u"结构判定：未检出明确异常结构特征。", u"Structural assessment: no explicit structural anomaly detected.")
+            : cdmanager::presentation::ui::text(m_language, u"结构判定：已检出异常结构特征，盘片存在中断写入或程序区尾段缺失的高度嫌疑。", u"Structural assessment: abnormal structural traits detected; interrupted writing or missing program-area tail is highly suspected.")
     );
 
     const int usedPercent = qRound(result.usageRatio * 100.0);
@@ -394,6 +457,7 @@ void DiscAnalysisWidget::applyResult(const cdmanager::application::import::DiscA
             .arg(result.spaceFree.isEmpty() ? QStringLiteral("n/a") : result.spaceFree)
     );
     static_cast<UsageRingWidget*>(m_usageRingWidget)->setUsageRatio(result.usageRatio);
+    static_cast<UsageRingWidget*>(m_usageRingWidget)->setRegionMarkers(result.regionMarkers);
 
     m_trackTree->clear();
     for (const auto& track : result.tracks) {
@@ -438,7 +502,7 @@ void DiscAnalysisWidget::applyResult(const cdmanager::application::import::DiscA
         if (probeIt != result.audioProbeResults.end()) {
             item->setText(6, probeSummaryText(*probeIt));
         } else {
-            item->setText(6, cdmanager::presentation::ui::text(m_language, u"未采样", u"not sampled"));
+            item->setText(6, cdmanager::presentation::ui::text(m_language, u"未执行", u"not executed"));
         }
 
         m_trackTree->addTopLevelItem(item);
@@ -453,8 +517,8 @@ void DiscAnalysisWidget::retranslateUi() {
     m_headerLabel->setText(text(m_language, u"光盘分析", u"Disc Analysis"));
     m_hintLabel->setText(text(
         m_language,
-        u"分析当前光盘的 TOC、CD-TEXT、音频时长和疑似写坏位置，特别适合检查写到一半断掉的盘。",
-        u"Inspect the current disc for TOC, CD-TEXT, audio runtime, and suspicious unwritten or damaged regions."
+        u"对当前光盘执行结构分析，汇总 TOC、CD-TEXT、容量信息与异常区段推定结果，适用于排查中断写入、尾段缺失及读取不一致等问题。",
+        u"Run a structural disc analysis that combines TOC, CD-TEXT, capacity metadata, and inferred abnormal ranges."
     ));
     m_analyzeButton->setText(text(m_language, u"分析当前光盘", u"Analyze Current Disc"));
     m_exportJsonButton->setText(text(m_language, u"导出 JSON", u"Export JSON"));
@@ -472,12 +536,12 @@ void DiscAnalysisWidget::retranslateUi() {
         text(m_language, u"艺术家", u"Artist"),
         text(m_language, u"时长", u"Duration"),
         text(m_language, u"起始地址", u"Start Address"),
-        text(m_language, u"扇区长度", u"Sector Length"),
-        text(m_language, u"音频抽样", u"Audio Sampling"),
+        text(m_language, u"区段长度", u"Region Length"),
+        text(m_language, u"检测结论", u"Assessment"),
     });
     m_detailsEdit->setPlaceholderText(text(
         m_language,
-        u"分析完成后，详细诊断会显示在这里。",
+        u"分析完成后，详细诊断报告会显示在这里。",
         u"Detailed analysis output appears here after the scan."
     ));
 

@@ -16,6 +16,7 @@
 #include "cdmanager/domain/project/CdProject.h"
 #include "cdmanager/presentation/ui/UiPreferences.h"
 #include <memory>
+#include <QSet>
 
 #include "cdmanager/infrastructure/disc/DiscDeviceGateway.h"
 #include "cdmanager/infrastructure/disc/DiscKeepAlive.h"
@@ -50,6 +51,7 @@ private:
     void applyCurrentTheme();
     void retranslateUi();
     QString uiText(QStringView chinese, QStringView english) const;
+    bool confirmRiskyTrackPlayback(int trackNumber, QStringView triggerLabel);
     void refreshProjectView();
     QString currentSourceModeText() const;
     QString importStatusText() const;
@@ -100,6 +102,8 @@ private:
     QTimer* m_mediaRefreshCooldownTimer {nullptr};
     bool m_mediaRefreshCoolingDown {false};
     bool m_pendingAutoDiscAnalysis {false};
+    bool m_discAnalysisInProgress {false};
+    QSet<int> m_suspiciousPlaybackTracks;
     int m_lastTrackCount = 0;
     QString m_lastDeviceId;
     QString m_lastMediaStatusSignature;

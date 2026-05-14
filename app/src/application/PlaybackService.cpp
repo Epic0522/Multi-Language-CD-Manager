@@ -24,6 +24,8 @@ PlaybackService::PlaybackService(QObject* parent)
     m_output->setRingBuffer(&m_ringBuffer);
     connect(m_output, &cdmanager::infrastructure::audio::AudioOutput::playbackFinished,
             this, &PlaybackService::onOutputFinished);
+    connect(m_output, &cdmanager::infrastructure::audio::AudioOutput::errorOccurred,
+            this, &PlaybackService::onOutputError);
 }
 
 PlaybackService::~PlaybackService() {
@@ -37,6 +39,7 @@ void PlaybackService::playTrack(int trackNumber) {
         trackNumber
     );
     if (!location.valid) {
+        Q_EMIT playbackError(QStringLiteral("无法定位音轨，或当前没有可用的音频输出/光驱设备。"));
         Q_EMIT playbackFinished();
         return;
     }
@@ -245,6 +248,12 @@ void PlaybackService::onReaderFinished() {
 }
 
 void PlaybackService::onReaderError(const QString& message) {
+    stop();
+    Q_EMIT playbackError(message);
+    Q_EMIT playbackFinished();
+}
+
+void PlaybackService::onOutputError(const QString& message) {
     stop();
     Q_EMIT playbackError(message);
     Q_EMIT playbackFinished();

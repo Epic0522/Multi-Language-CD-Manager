@@ -31,22 +31,62 @@ void AudioOutput::start() {
     format.setSampleFormat(QAudioFormat::Int16);
 
     const QAudioDevice defaultDevice = QMediaDevices::defaultAudioOutput();
+    if (defaultDevice.isNull()) {
+        Q_EMIT errorOccurred(QStringLiteral("No default audio output device is available."));
+        return;
+    }
     if (!defaultDevice.isFormatSupported(format)) {
         format.setSampleFormat(QAudioFormat::Float);
         if (!defaultDevice.isFormatSupported(format)) {
             qWarning("AudioOutput: neither Int16 nor Float is supported.");
+            Q_EMIT errorOccurred(
+                QStringLiteral("Default audio output does not support CD audio playback format.")
+            );
             return;
         }
     }
 
     m_sink = new QAudioSink(defaultDevice, format, this);
     m_sink->setBufferSize(kSampleRate * kChannelCount * 2 / 2);  // ~0.5 seconds
+    connect(
+        m_sink,
+        &QAudioSink::stateChanged,
+        this,
+        [this](QAudio::State state) {
+            if (m_sink == nullptr || state != QAudio::StoppedState) {
+                return;
+            }
+            const auto sinkError = m_sink->error();
+            if (sinkError == QtAudio::NoError) {
+                return;
+            }
+            QString message = QStringLiteral("Audio output stopped unexpectedly.");
+            switch (sinkError) {
+                case QtAudio::OpenError:
+                    message = QStringLiteral("Failed to open the selected audio output device.");
+                    break;
+                case QtAudio::IOError:
+                    message = QStringLiteral("Audio output device I/O failed.");
+                    break;
+                case QtAudio::FatalError:
+                    message = QStringLiteral("Audio output device reported a fatal error.");
+                    break;
+                case QtAudio::NoError:
+                    break;
+            }
+            Q_EMIT errorOccurred(message);
+        }
+    );
 
     m_feedTimer = new QTimer(this);
     connect(m_feedTimer, &QTimer::timeout, this, &AudioOutput::feedAudio);
     m_feedTimer->start(kTimerIntervalMs);
 
     m_device = m_sink->start();
+    if (m_device == nullptr) {
+        Q_EMIT errorOccurred(QStringLiteral("Could not start audio playback on the default output device."));
+        stop();
+    }
 }
 
 void AudioOutput::stop() {

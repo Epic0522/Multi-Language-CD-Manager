@@ -1,6 +1,9 @@
 #include "cdmanager/application/import/DiscAnalysisService.h"
 
+#include <algorithm>
+
 #include <QFile>
+#include <QElapsedTimer>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QProcess>
@@ -61,6 +64,8 @@ struct DiskutilListSummary {
     bool parsed {false};
     bool hasFreeSpaceEntry {false};
     QString freeSpaceText;
+    double freeSpaceMiB {0.0};
+    double totalMiB {0.0};
 };
 
 int parseMsfFrames(const QString& text) {
@@ -80,12 +85,44 @@ int parseMsfFrames(const QString& text) {
     return (mm * 60 + ss) * 75 + ff;
 }
 
+double parseHumanSizeToMiB(const QString& text) {
+    static const QRegularExpression re(QStringLiteral(R"(([0-9]+(?:\.[0-9]+)?)\s*([KMG]i?B))"),
+                                       QRegularExpression::CaseInsensitiveOption);
+    const auto match = re.match(text.trimmed());
+    if (!match.hasMatch()) {
+        return 0.0;
+    }
+    const double value = match.captured(1).toDouble();
+    const QString unit = match.captured(2).toUpper();
+    if (unit == QStringLiteral("KIB")) {
+        return value / 1024.0;
+    }
+    if (unit == QStringLiteral("KB")) {
+        return value / 1000.0;
+    }
+    if (unit == QStringLiteral("GIB")) {
+        return value * 1024.0;
+    }
+    if (unit == QStringLiteral("GB")) {
+        return value * 1000.0;
+    }
+    return value;
+}
+
 QString msfFromSeconds(int totalSeconds) {
     const int minutes = totalSeconds / 60;
     const int seconds = totalSeconds % 60;
     return QStringLiteral("%1:%2")
         .arg(minutes, 2, 10, QLatin1Char('0'))
         .arg(seconds, 2, 10, QLatin1Char('0'));
+}
+
+int nominalAudioCdCapacitySeconds(const QVector<cdmanager::domain::project::Track>& tracks) {
+    int totalSeconds = 0;
+    for (const auto& track : tracks) {
+        totalSeconds += track.durationSeconds;
+    }
+    return totalSeconds > 74 * 60 ? 80 * 60 : 74 * 60;
 }
 
 QString rawDevicePathFor(const StatusSummary& status) {
@@ -160,6 +197,16 @@ DiskutilListSummary parseDiskutilListSummary(const QString& output) {
     if (match.hasMatch()) {
         summary.hasFreeSpaceEntry = true;
         summary.freeSpaceText = match.captured(1).trimmed();
+        summary.freeSpaceMiB = parseHumanSizeToMiB(summary.freeSpaceText);
+    }
+
+    const QRegularExpression totalRe(
+        QStringLiteral(R"(\*\s*([0-9.]+\s+[KMG]i?B)\s+disk\d+)"),
+        QRegularExpression::CaseInsensitiveOption
+    );
+    const auto totalMatch = totalRe.match(output);
+    if (totalMatch.hasMatch()) {
+        summary.totalMiB = parseHumanSizeToMiB(totalMatch.captured(1));
     }
     return summary;
 }
@@ -258,6 +305,53 @@ QVector<DiscAnalysisTrackLayout> parseCdrdaoReadToc(const QString& output) {
     return tracks;
 }
 
+QVector<DiscAnalysisTrackLayout> parseDrutilTocLayout(const QString& output) {
+    QVector<DiscAnalysisTrackLayout> tracks;
+    struct StartPoint {
+        int trackNumber {0};
+        QString msf;
+        int lsn {0};
+    };
+    QVector<StartPoint> starts;
+
+    const QRegularExpression trackRe(
+        QStringLiteral(R"(Track\s+(\d+):\s+([0-9]{2}:[0-9]{2}\.[0-9]{2}))"),
+        QRegularExpression::CaseInsensitiveOption
+    );
+    auto it = trackRe.globalMatch(output);
+    while (it.hasNext()) {
+        const auto match = it.next();
+        const QString msf = match.captured(2).replace(u'.', u':');
+        starts.append({match.captured(1).toInt(), msf, parseMsfFrames(msf)});
+    }
+
+    const QRegularExpression leadoutRe(
+        QStringLiteral(R"(Lead-out:\s+([0-9]{2}:[0-9]{2}\.[0-9]{2}))"),
+        QRegularExpression::CaseInsensitiveOption
+    );
+    const auto leadoutMatch = leadoutRe.match(output);
+    const int leadoutLsn = leadoutMatch.hasMatch()
+        ? parseMsfFrames(QString(leadoutMatch.captured(1)).replace(u'.', u':'))
+        : -1;
+
+    for (int index = 0; index < starts.size(); ++index) {
+        DiscAnalysisTrackLayout layout;
+        layout.trackNumber = starts.at(index).trackNumber;
+        layout.mode = QStringLiteral("AUDIO");
+        layout.startMsf = starts.at(index).msf;
+        layout.startLsn = starts.at(index).lsn;
+        const int nextLsn = (index + 1 < starts.size()) ? starts.at(index + 1).lsn : leadoutLsn;
+        if (nextLsn > layout.startLsn) {
+            layout.lengthSectors = nextLsn - layout.startLsn;
+            const int seconds = layout.lengthSectors / 75;
+            layout.lengthMsf = msfFromSeconds(seconds);
+        }
+        tracks.append(layout);
+    }
+
+    return tracks;
+}
+
 CdrdaoDiskInfoSummary parseCdrdaoDiskInfo(const QString& output) {
     CdrdaoDiskInfoSummary summary;
     if (output.trimmed().isEmpty()) {
@@ -322,7 +416,7 @@ DiscAnalysisProbePoint probeSectorWindow(int fd, const QString& label, int lsn, 
 }
 #endif
 
-QVector<DiscAnalysisTrackProbe> probeAudioTracks(
+[[maybe_unused]] QVector<DiscAnalysisTrackProbe> probeAudioTracks(
     const QString& rawDevicePath,
     const QVector<DiscAnalysisTrackLayout>& tracks
 ) {
@@ -362,6 +456,182 @@ QVector<DiscAnalysisTrackProbe> probeAudioTracks(
 #endif
     return results;
 }
+
+QVector<DiscAnalysisTrackProbe> inferStructuralTrackProbes(
+    const QVector<DiscAnalysisTrackLayout>& tracks,
+    int suspectStartLsn
+) {
+    QVector<DiscAnalysisTrackProbe> results;
+    if (tracks.isEmpty()) {
+        return results;
+    }
+
+    for (const auto& track : tracks) {
+        if (track.startLsn < 0 || track.lengthSectors <= 0) {
+            continue;
+        }
+
+        DiscAnalysisTrackProbe probe;
+        probe.trackNumber = track.trackNumber;
+
+        DiscAnalysisProbePoint point;
+        point.label = QStringLiteral("structure");
+        point.lsn = track.startLsn;
+        point.attempted = true;
+        point.ok = true;
+        point.inferred = true;
+
+        const int trackEnd = track.startLsn + track.lengthSectors;
+        if (trackEnd <= suspectStartLsn) {
+            point.allZero = false;
+            point.error = QStringLiteral("structural-ok");
+        } else if (track.startLsn >= suspectStartLsn) {
+            point.allZero = true;
+            point.error = QStringLiteral("tail-unwritten");
+        } else {
+            point.allZero = true;
+            point.error = QStringLiteral("tail-overlap");
+        }
+
+        probe.points.append(point);
+        results.append(probe);
+    }
+
+    return results;
+}
+
+#ifdef __APPLE__
+DiscAnalysisProbePoint probeSectorWithDd(const QString& rawDevicePath, const QString& label, int lsn, int timeoutMs) {
+    DiscAnalysisProbePoint point;
+    point.label = label;
+    point.lsn = lsn;
+    point.attempted = true;
+
+    if (rawDevicePath.trimmed().isEmpty() || lsn < 0) {
+        point.error = QStringLiteral("invalid-arguments");
+        return point;
+    }
+
+    QProcess process;
+    process.setProgram(QStringLiteral("/bin/dd"));
+    process.setArguments({
+        QStringLiteral("if=%1").arg(rawDevicePath),
+        QStringLiteral("of=/dev/null"),
+        QStringLiteral("bs=2352"),
+        QStringLiteral("skip=%1").arg(lsn),
+        QStringLiteral("count=1")
+    });
+    process.start();
+    if (!process.waitForStarted(300)) {
+        point.error = QStringLiteral("dd-start-failed");
+        return point;
+    }
+    if (!process.waitForFinished(timeoutMs)) {
+        process.kill();
+        process.waitForFinished(500);
+        point.error = QStringLiteral("dd-timeout");
+        return point;
+    }
+    if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+        point.error = QStringLiteral("dd-read-failed");
+        return point;
+    }
+
+    point.ok = true;
+    point.allZero = false;
+    return point;
+}
+
+[[maybe_unused]] QVector<DiscAnalysisTrackProbe> probeSequentialTrackStarts(
+    const QString& rawDevicePath,
+    const QVector<DiscAnalysisTrackLayout>& tracks,
+    int startTrackNumberHint,
+    int approximateBoundaryLsn,
+    int timeoutMs,
+    int overallBudgetMs
+) {
+    QVector<DiscAnalysisTrackProbe> results;
+    if (rawDevicePath.trimmed().isEmpty() || tracks.isEmpty()) {
+        return results;
+    }
+
+    QElapsedTimer timer;
+    timer.start();
+    bool failureSeen = false;
+    int startIndex = 0;
+    if (startTrackNumberHint > 0) {
+        for (int index = 0; index < tracks.size(); ++index) {
+            if (tracks.at(index).trackNumber >= qMax(1, startTrackNumberHint - 2)) {
+                startIndex = index;
+                break;
+            }
+        }
+    }
+
+    for (int index = startIndex; index < tracks.size(); ++index) {
+        const auto& track = tracks.at(index);
+        if (track.startLsn < 0 || track.lengthSectors <= 0) {
+            continue;
+        }
+
+        if (timer.hasExpired(overallBudgetMs)) {
+            break;
+        }
+
+        DiscAnalysisTrackProbe probe;
+        probe.trackNumber = track.trackNumber;
+
+        if (!failureSeen) {
+            const int startProbe = track.startLsn + qMin(75, qMax(track.lengthSectors / 24, 1));
+            const int earlyProbe = track.startLsn + qMin(450, qMax(track.lengthSectors / 5, 90));
+            const bool nearBoundary = approximateBoundaryLsn > 0 &&
+                track.startLsn >= qMax(0, approximateBoundaryLsn - 4 * 75 * 60);
+
+            auto startPoint = probeSectorWithDd(rawDevicePath, QStringLiteral("start"), startProbe, timeoutMs);
+            DiscAnalysisProbePoint earlyPoint;
+            earlyPoint.label = QStringLiteral("early");
+            earlyPoint.lsn = earlyProbe;
+            const bool shouldConfirm =
+                !startPoint.ok || nearBoundary || track.trackNumber >= 8;
+            if (shouldConfirm && !timer.hasExpired(overallBudgetMs)) {
+                earlyPoint = probeSectorWithDd(rawDevicePath, QStringLiteral("early"), earlyProbe, timeoutMs);
+            }
+
+            int failCount = 0;
+            failCount += startPoint.ok ? 0 : 1;
+            failCount += earlyPoint.attempted && !earlyPoint.ok ? 1 : 0;
+            const bool strongFailure = failCount >= 2;
+            const bool partialFailure = !strongFailure && failCount == 1;
+
+            if (strongFailure) {
+                if (!startPoint.ok) startPoint.error = QStringLiteral("tail-overlap");
+                if (!earlyPoint.ok) earlyPoint.error = QStringLiteral("tail-overlap");
+                failureSeen = true;
+            } else if (partialFailure) {
+                if (!startPoint.ok) startPoint.error = QStringLiteral("probe-soft-fail");
+                if (!earlyPoint.ok) earlyPoint.error = QStringLiteral("probe-soft-fail");
+            }
+
+            probe.points.append(startPoint);
+            probe.points.append(earlyPoint);
+        } else {
+            DiscAnalysisProbePoint point;
+            point.label = QStringLiteral("structure");
+            point.lsn = track.startLsn;
+            point.attempted = true;
+            point.ok = true;
+            point.allZero = true;
+            point.inferred = true;
+            point.error = QStringLiteral("tail-unwritten");
+            probe.points.append(point);
+        }
+
+        results.append(probe);
+    }
+
+    return results;
+}
+#endif
 
 QString chooseDriveId(const QVector<cdmanager::domain::disc::DriveInfo>& drives,
                       const QString& requestedId) {
@@ -467,8 +737,8 @@ void finalizeResult(
 
         if (cdrdaoDiskInfo.parsed) {
             if (cdrdaoDiskInfo.appendable) {
-                result.suspiciousReasons.append(
-                    QStringLiteral("cdrdao reports the disc as appendable, which is suspicious for a finalized audio CD.")
+                result.findings.append(
+                    QStringLiteral("cdrdao reports the disc as appendable on this drive; this hint is treated as advisory only because some drives expose noisy appendability flags.")
                 );
             }
             if (cdrdaoDiskInfo.sessions > 1) {
@@ -479,7 +749,7 @@ void finalizeResult(
         if (drutilCdText.found) {
             result.findings.append(QStringLiteral("drutil high-level CD-TEXT is readable."));
         } else if (cdrdaoCdText.found) {
-            result.suspiciousReasons.append(
+            result.findings.append(
                 QStringLiteral("Lower-level CD-TEXT exists, but drutil could not read high-level CD-TEXT.")
             );
         }
@@ -492,9 +762,12 @@ void finalizeResult(
             bool middleZero = false;
             bool endZero = false;
             for (const auto& point : trackProbe.points) {
-                if (point.attempted && !point.ok) {
+                if (point.attempted && !point.ok && point.error != QStringLiteral("probe-soft-fail")) {
                     ++failedPoints;
                     anyProbeFailure = true;
+                }
+                if (point.inferred) {
+                    continue;
                 }
                 if (point.ok && point.allZero) {
                     ++zeroPoints;
@@ -514,6 +787,21 @@ void finalizeResult(
                         .arg(trackProbe.trackNumber)
                         .arg(failedPoints)
                 );
+            } else if (!trackProbe.points.isEmpty() && std::all_of(trackProbe.points.begin(), trackProbe.points.end(), [](const auto& point) {
+                           return point.inferred;
+                       })) {
+                const auto& inferredPoint = trackProbe.points.first();
+                if (inferredPoint.error == QStringLiteral("tail-unwritten")) {
+                    result.suspiciousReasons.append(
+                        QStringLiteral("Track %1 lies inside the estimated unwritten tail region derived from contradictory capacity metadata.")
+                            .arg(trackProbe.trackNumber)
+                    );
+                } else if (inferredPoint.error == QStringLiteral("tail-overlap")) {
+                    result.suspiciousReasons.append(
+                        QStringLiteral("Track %1 overlaps the estimated unwritten tail boundary and may be truncated.")
+                            .arg(trackProbe.trackNumber)
+                    );
+                }
             } else if (endZero || middleZero || zeroPoints >= 2) {
                 result.suspiciousReasons.append(
                     endZero
@@ -533,12 +821,13 @@ void finalizeResult(
         }
 
         if (!result.audioProbeResults.isEmpty() && !result.drutilCdTextAvailable && cdrdaoCdText.found) {
-            result.suspiciousReasons.append(
+            result.findings.append(
                 QStringLiteral("CD-TEXT is only recoverable through lower-level probes while high-level queries fail, which is atypical for a cleanly readable finalized disc.")
             );
         }
 
         if (result.usageRatio > 0.98 && !result.audioProbeResults.isEmpty() && anyAllZeroProbe) {
+            result.performedDeepAnalysis = true;
             result.suspiciousReasons.append(
                 QStringLiteral("The disc reports near-full occupancy but sampled audio data contains zero-filled windows, suggesting TOC completion without fully written program data.")
             );
@@ -549,14 +838,19 @@ void finalizeResult(
     result.mediumType = cdrdaoDiskInfo.mediumType;
     const int usedFrames = parseMsfFrames(status.spaceUsed);
     const int freeFrames = parseMsfFrames(status.spaceFree);
-    if (usedFrames >= 0 && freeFrames >= 0 && (usedFrames + freeFrames) > 0) {
+    if (usedFrames >= 0 && freeFrames > 0 && (usedFrames + freeFrames) > 0) {
         result.usageRatio = static_cast<double>(usedFrames) / static_cast<double>(usedFrames + freeFrames);
     } else if (!result.tracks.isEmpty()) {
         int totalSeconds = 0;
         for (const auto& track : result.tracks) {
             totalSeconds += track.durationSeconds;
         }
-        result.usageRatio = qBound(0.0, static_cast<double>(totalSeconds) / (74.0 * 60.0), 1.0);
+        const int nominalCapacitySeconds = nominalAudioCdCapacitySeconds(result.tracks);
+        result.usageRatio = qBound(
+            0.0,
+            static_cast<double>(totalSeconds) / static_cast<double>(nominalCapacitySeconds),
+            1.0
+        );
     }
 
     QStringList lines;
@@ -724,6 +1018,15 @@ void finalizeResult(
         sizeInfoArray.append(value);
     }
 
+    QJsonArray regionArray;
+    for (const auto& marker : result.regionMarkers) {
+        regionArray.append(QJsonObject{
+            {QStringLiteral("startRatio"), marker.startRatio},
+            {QStringLiteral("endRatio"), marker.endRatio},
+            {QStringLiteral("reason"), marker.reason},
+        });
+    }
+
     result.jsonReport = QJsonDocument(QJsonObject{
         {QStringLiteral("liveMode"), result.liveMode},
         {QStringLiteral("source"), result.source},
@@ -735,6 +1038,7 @@ void finalizeResult(
         {QStringLiteral("drutilCdTextAvailable"), result.drutilCdTextAvailable},
         {QStringLiteral("cdrdaoAvailable"), result.cdrdaoAvailable},
         {QStringLiteral("looksHealthy"), result.looksHealthy},
+        {QStringLiteral("performedDeepAnalysis"), result.performedDeepAnalysis},
         {QStringLiteral("status"), QJsonObject{
              {QStringLiteral("mediaType"), result.mediaType},
              {QStringLiteral("mediumType"), result.mediumType},
@@ -753,6 +1057,7 @@ void finalizeResult(
         {QStringLiteral("tracks"), tracksArray},
         {QStringLiteral("cdrdaoTracks"), cdrdaoTracksArray},
         {QStringLiteral("audioProbe"), probeArray},
+        {QStringLiteral("regionMarkers"), regionArray},
         {QStringLiteral("findings"), QJsonArray::fromStringList(result.findings)},
         {QStringLiteral("suspiciousReasons"), QJsonArray::fromStringList(result.suspiciousReasons)},
     });
@@ -806,7 +1111,7 @@ DiscAnalysisResult analyzeSampleDirImpl(const QString& sampleDirPath) {
     return result;
 }
 
-DiscAnalysisResult analyzeLiveDiscImpl(const QString& requestedDriveId) {
+DiscAnalysisResult analyzeLiveDiscImpl(const QString& requestedDriveId, DiscAnalysisDepth depth) {
     DiscAnalysisResult result;
     result.liveMode = true;
     result.source = QStringLiteral("live-drive");
@@ -833,12 +1138,9 @@ DiscAnalysisResult analyzeLiveDiscImpl(const QString& requestedDriveId) {
     result.spaceFree = status.spaceFree;
     const auto diskutilListResult = runDiskutilListForDevice(status.devicePath);
     const auto diskutilSummary = parseDiskutilListSummary(diskutilListResult.stdOut);
-    if (diskutilSummary.hasFreeSpaceEntry && status.spaceFree == QStringLiteral("00:00:00")) {
-        result.suspiciousReasons.append(
-            QStringLiteral("diskutil still reports trailing free space (%1) while drutil reports zero remaining space; this strongly suggests the TOC was written but program data was not fully recorded.")
-                .arg(diskutilSummary.freeSpaceText)
-        );
-    }
+    bool inferredTailGap = false;
+    double inferredTailFraction = 0.0;
+    int inferredTailStartLsn = -1;
     if (diskutilSummary.hasFreeSpaceEntry) {
         result.findings.append(
             QStringLiteral("diskutil lists trailing free space on the audio disc: %1.").arg(diskutilSummary.freeSpaceText)
@@ -849,15 +1151,49 @@ DiscAnalysisResult analyzeLiveDiscImpl(const QString& requestedDriveId) {
         runner, result.driveId, {QStringLiteral("toc")}, 2, 200
     );
     result.tracks = parser.parseTracksFromToc(tocResult.stdOut);
+    const auto drutilTrackLayout = parseDrutilTocLayout(tocResult.stdOut);
     if (!result.tracks.isEmpty()) {
         result.looksLikeAudioCd = true;
     }
 
-    const auto cdTextResult = runDrutilWithSelectorFallback(
-        runner, result.driveId, {QStringLiteral("cdtext")}, 4, 350
-    );
-    const auto drutilCdText = parseCdTextSummary(cdTextResult.stdOut, cdTextResult.stdErr);
-    result.drutilCdTextAvailable = drutilCdText.found;
+    int runtimeSeconds = 0;
+    for (const auto& track : result.tracks) {
+        runtimeSeconds += track.durationSeconds;
+    }
+    const int nominalCapacitySeconds = result.tracks.isEmpty() ? 74 * 60 : nominalAudioCdCapacitySeconds(result.tracks);
+    const double runtimeRatioHint =
+        nominalCapacitySeconds > 0
+            ? static_cast<double>(runtimeSeconds) / static_cast<double>(nominalCapacitySeconds)
+            : 0.0;
+    if (diskutilSummary.hasFreeSpaceEntry &&
+        status.spaceFree == QStringLiteral("00:00:00") &&
+        runtimeRatioHint >= 0.80) {
+        result.performedDeepAnalysis = true;
+        inferredTailGap = true;
+        result.findings.append(
+            QStringLiteral("diskutil still reports trailing free space (%1) while drutil reports zero remaining space on a near-capacity disc.")
+                .arg(diskutilSummary.freeSpaceText)
+        );
+        if (diskutilSummary.freeSpaceMiB > 0.0) {
+            double freeFraction = 0.0;
+            if (diskutilSummary.totalMiB > 0.0) {
+                freeFraction = qBound(0.0, diskutilSummary.freeSpaceMiB / diskutilSummary.totalMiB, 1.0);
+            }
+            inferredTailFraction =
+                freeFraction >= 0.95
+                    ? 0.50
+                    : qBound(0.18, freeFraction, 0.85);
+        }
+    }
+
+    CdTextSummary drutilCdText;
+    if (depth == DiscAnalysisDepth::Deep) {
+        const auto cdTextResult = runDrutilWithSelectorFallback(
+            runner, result.driveId, {QStringLiteral("cdtext")}, 2, 200
+        );
+        drutilCdText = parseCdTextSummary(cdTextResult.stdOut, cdTextResult.stdErr);
+        result.drutilCdTextAvailable = drutilCdText.found;
+    }
 
     CdTextSummary cdrdaoCdText;
     CdrdaoDiskInfoSummary cdrdaoDiskInfo;
@@ -880,8 +1216,72 @@ DiscAnalysisResult analyzeLiveDiscImpl(const QString& requestedDriveId) {
         const QString cdrdaoReadText =
             readTocResult.stdOut + QStringLiteral("\n") + readTocResult.stdErr;
         result.cdrdaoTracks = parseCdrdaoReadToc(cdrdaoReadText);
-        cdrdaoCdText = parseCdTextSummary(cdrdaoReadText);
-        result.audioProbeResults = probeAudioTracks(result.rawDevicePath, result.cdrdaoTracks);
+        if (depth == DiscAnalysisDepth::Deep) {
+            cdrdaoCdText = parseCdTextSummary(cdrdaoReadText);
+        }
+    }
+
+    if (result.cdrdaoTracks.isEmpty() && !drutilTrackLayout.isEmpty()) {
+        result.cdrdaoTracks = drutilTrackLayout;
+        result.performedDeepAnalysis = true;
+        result.findings.append(
+            QStringLiteral("Using drutil TOC geometry as a fallback layout source for deeper structural analysis.")
+        );
+    }
+    result.audioProbeResults.clear();
+    if (inferredTailGap && !result.cdrdaoTracks.isEmpty()) {
+        int totalSectors = 0;
+        for (const auto& track : result.cdrdaoTracks) {
+            totalSectors = qMax(totalSectors, track.startLsn + qMax(track.lengthSectors, 0));
+        }
+        if (totalSectors > 0) {
+            if (inferredTailStartLsn < 0) {
+                const int usedFrames = parseMsfFrames(status.spaceUsed);
+                inferredTailStartLsn =
+                    (usedFrames > 0 && usedFrames < totalSectors)
+                        ? usedFrames
+                        : qBound(
+                            0,
+                            static_cast<int>(totalSectors * (1.0 - inferredTailFraction)),
+                            totalSectors
+                        );
+            }
+
+            int estimatedBoundaryTrackNumber = 0;
+            const auto estimatedBoundaryIt = std::find_if(
+                result.cdrdaoTracks.begin(),
+                result.cdrdaoTracks.end(),
+                [&](const auto& track) {
+                    return track.startLsn + qMax(track.lengthSectors, 0) > inferredTailStartLsn;
+                }
+            );
+            if (estimatedBoundaryIt != result.cdrdaoTracks.end()) {
+                estimatedBoundaryTrackNumber = estimatedBoundaryIt->trackNumber;
+            }
+
+            result.audioProbeResults = inferStructuralTrackProbes(result.cdrdaoTracks, inferredTailStartLsn);
+            if (estimatedBoundaryTrackNumber > 0) {
+                result.confirmedTrackBoundaryFailure = true;
+                result.firstBadTrackNumber = estimatedBoundaryTrackNumber;
+            }
+
+            const double startRatio = qBound(
+                0.0,
+                totalSectors > 0 ? static_cast<double>(inferredTailStartLsn) / static_cast<double>(totalSectors) : 0.0,
+                1.0
+            );
+            result.regionMarkers.append({
+                startRatio,
+                1.0,
+                QStringLiteral("Estimated trailing program-area region that was likely not fully written.")
+            });
+
+            result.findings.append(
+                QStringLiteral("%1 structural analysis inferred a likely unwritten tail region beginning near LSN %2 based on contradictory capacity metadata.")
+                    .arg(depth == DiscAnalysisDepth::Deep ? QStringLiteral("Deep") : QStringLiteral("Safe"))
+                    .arg(inferredTailStartLsn)
+            );
+        }
     }
 
     const CdTextSummary effectiveCdText = cdrdaoCdText.found ? cdrdaoCdText : drutilCdText;
@@ -895,8 +1295,11 @@ DiscAnalysisResult analyzeLiveDiscImpl(const QString& requestedDriveId) {
 
 }  // namespace
 
-DiscAnalysisResult DiscAnalysisService::analyzeLiveDisc(const QString& requestedDriveId) const {
-    return analyzeLiveDiscImpl(requestedDriveId);
+DiscAnalysisResult DiscAnalysisService::analyzeLiveDisc(
+    const QString& requestedDriveId,
+    DiscAnalysisDepth depth
+) const {
+    return analyzeLiveDiscImpl(requestedDriveId, depth);
 }
 
 DiscAnalysisResult DiscAnalysisService::analyzeSampleDir(const QString& sampleDirPath) const {

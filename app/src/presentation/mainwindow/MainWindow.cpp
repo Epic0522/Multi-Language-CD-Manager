@@ -2,6 +2,7 @@
 
 #include <QApplication>
 #include <QLabel>
+#include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPointer>
 #include <QPushButton>
@@ -585,7 +586,7 @@ MainWindow::MainWindow(QWidget* parent)
     refreshProjectView();
     if (m_initialImportResult.status == cdmanager::application::import::DiscImportStatus::Success
         && m_discAnalysisWidget != nullptr) {
-        m_discAnalysisWidget->analyzeCurrentDisc();
+        m_discAnalysisWidget->analyzeCurrentDisc(cdmanager::application::import::DiscAnalysisDepth::Deep);
     }
 
     connect(
@@ -716,6 +717,7 @@ void MainWindow::buildUi() {
         &cdmanager::presentation::editor::DiscAnalysisWidget::analysisStarted,
         this,
         [this]() {
+            m_discAnalysisInProgress = true;
             statusBar()->showMessage(QStringLiteral("正在分析光碟结构与音轨信息…"));
         }
     );
@@ -723,11 +725,31 @@ void MainWindow::buildUi() {
         m_discAnalysisWidget,
         &cdmanager::presentation::editor::DiscAnalysisWidget::analysisFinished,
         this,
-        [this](bool healthy) {
+        [this](bool healthy, bool performedDeepAnalysis) {
+            m_discAnalysisInProgress = false;
+            m_suspiciousPlaybackTracks.clear();
+            if (m_discAnalysisWidget != nullptr) {
+                const auto& result = m_discAnalysisWidget->lastResult();
+                if (result.confirmedTrackBoundaryFailure && result.firstBadTrackNumber > 0) {
+                    for (const auto& probe : result.audioProbeResults) {
+                        const bool risky = probe.trackNumber >= result.firstBadTrackNumber &&
+                            std::any_of(probe.points.begin(), probe.points.end(), [](const auto& point) {
+                                return point.error == QStringLiteral("tail-unwritten") ||
+                                    point.error == QStringLiteral("tail-overlap");
+                            });
+                        if (risky) {
+                            m_suspiciousPlaybackTracks.insert(probe.trackNumber);
+                        }
+                    }
+                }
+            }
+            refreshProjectView();
             statusBar()->showMessage(
-                healthy
-                    ? QStringLiteral("光碟分析完成：未见明显结构异常。")
-                    : QStringLiteral("光碟分析完成：检测到可疑结构特征。"),
+                !healthy && performedDeepAnalysis
+                    ? QStringLiteral("光碟分析完成：已检出异常盘片，并完成扩展结构分析。")
+                    : (healthy
+                        ? QStringLiteral("光碟分析完成：未检出明确异常结构特征。")
+                        : QStringLiteral("光碟分析完成：已检出异常结构特征。")),
                 5000
             );
         }
@@ -750,9 +772,17 @@ void MainWindow::buildUi() {
     connect(m_stopButton, &QPushButton::clicked,
             this, &MainWindow::onStopClicked);
     connect(m_prevButton, &QPushButton::clicked, [this]() {
+        const int targetTrack = qMax(1, m_playbackService.currentTrackNumber() - 1);
+        if (!confirmRiskyTrackPlayback(targetTrack, u"上一曲")) {
+            return;
+        }
         m_playbackService.previousTrack();
     });
     connect(m_nextButton, &QPushButton::clicked, [this]() {
+        const int targetTrack = m_playbackService.currentTrackNumber() + 1;
+        if (!confirmRiskyTrackPlayback(targetTrack, u"下一曲")) {
+            return;
+        }
         m_playbackService.nextTrack();
     });
     connect(m_modeButton, &QPushButton::clicked, [this]() {
@@ -788,7 +818,9 @@ void MainWindow::buildUi() {
             this, &MainWindow::onPlaybackFinished);
     connect(&m_playbackService, &cdmanager::application::PlaybackService::playbackError,
             this, [this](const QString& msg) {
-                m_playbackStatusLabel->setText(QStringLiteral("Error: %1").arg(msg));
+                const QString localized = uiText(u"播放失败：%1", u"Playback failed: %1").arg(msg);
+                m_playbackStatusLabel->setText(localized);
+                statusBar()->showMessage(localized, 6000);
             });
 
     // Slider dragging — pause while user scrubs, then seek.
@@ -801,6 +833,9 @@ void MainWindow::buildUi() {
     });
     connect(m_trackTableWidget, &cdmanager::presentation::editor::TrackTableWidget::trackDoubleClicked,
             this, [this](int trackNumber) {
+                if (!confirmRiskyTrackPlayback(trackNumber, u"播放")) {
+                    return;
+                }
                 m_playbackService.playTrack(trackNumber);
             });
 
@@ -1521,6 +1556,7 @@ void MainWindow::refreshProjectView() {
                     : cdmanager::infrastructure::audio::AudioCdReader::defaultDevicePath())
         );
     }
+    m_trackTableWidget->setSuspiciousTracks(m_suspiciousPlaybackTracks);
     m_trackTableWidget->setTracks(overview.trackRows);
     if (m_initialImportResult.status == cdmanager::application::import::DiscImportStatus::BlankWritableMedia) {
         m_playbackStatusLabel->setText(uiText(u"空白可写光盘已就绪，请前往刻录页。", u"Blank writable disc ready. Open the burn page."));
@@ -1782,6 +1818,37 @@ QString MainWindow::uiText(QStringView chinese, QStringView english) const {
     return cdmanager::presentation::ui::text(m_language, chinese, english);
 }
 
+bool MainWindow::confirmRiskyTrackPlayback(int trackNumber, QStringView triggerLabel) {
+    if (!m_suspiciousPlaybackTracks.contains(trackNumber)) {
+        return true;
+    }
+
+    const QString title = uiText(u"损坏区段警告", u"Damaged Region Warning");
+    const QString body = uiText(
+        u"音轨 T%1 已被分析结果标记为疑似损坏区段。\n\n继续执行“%2”可能导致光驱反复巡道、长时间无响应，甚至需要重新插拔设备。\n\n是否仍然继续？",
+        u"Track T%1 has been marked as a suspected damaged region.\n\nContinuing \"%2\" may cause repeated seek retries or a stalled optical drive.\n\nDo you still want to continue?"
+    ).arg(trackNumber).arg(QString(triggerLabel));
+
+    m_playbackStatusLabel->setText(
+        uiText(u"强警告：T%1 位于疑似损坏区段。", u"Critical warning: T%1 is inside a suspected damaged region.")
+            .arg(trackNumber)
+    );
+    statusBar()->showMessage(
+        uiText(u"强警告：T%1 位于疑似损坏区段，请谨慎操作。", u"Critical warning: T%1 is inside a suspected damaged region.")
+            .arg(trackNumber),
+        7000
+    );
+
+    const auto reply = QMessageBox::warning(
+        this,
+        title,
+        body,
+        QMessageBox::Yes | QMessageBox::No,
+        QMessageBox::No
+    );
+    return reply == QMessageBox::Yes;
+}
+
 void MainWindow::showEvent(QShowEvent* event) {
     QMainWindow::showEvent(event);
     applyCurrentTheme();
@@ -1868,6 +1935,7 @@ void MainWindow::refreshFromCurrentDriveState() {
     if (m_playbackService.state() == cdmanager::application::PlaybackState::Playing ||
         m_playbackService.state() == cdmanager::application::PlaybackState::Paused ||
         m_isExporting ||
+        m_discAnalysisInProgress ||
         m_gateway->mode() == cdmanager::infrastructure::disc::GatewayMode::Sample ||
         m_mediaRefreshCoolingDown) {
         return;
@@ -1881,6 +1949,7 @@ void MainWindow::refreshFromCurrentDriveState() {
     const auto drives = m_discImportService.availableDrives();
     if (drives.isEmpty()) {
         m_playbackService.stop();
+        m_suspiciousPlaybackTracks.clear();
         m_lastMediaStatusSignature.clear();
         m_project = cdmanager::domain::project::CdProject{};
         m_initialImportResult = {
@@ -1896,7 +1965,6 @@ void MainWindow::refreshFromCurrentDriveState() {
     }
 
     m_lastDeviceId = drives.first().deviceId;
-    statusBar()->showMessage(QStringLiteral("正在读取光碟状态…"));
 
     const QString idx = m_lastDeviceId.mid(QStringLiteral("drutil-index://").size());
     const cdmanager::infrastructure::disc::DrutilCommandRunner runner;
@@ -1913,6 +1981,8 @@ void MainWindow::refreshFromCurrentDriveState() {
     m_lastMediaStatusSignature = currentSignature;
 
     m_playbackService.stop();
+    m_suspiciousPlaybackTracks.clear();
+    statusBar()->showMessage(QStringLiteral("正在读取光碟状态…"));
     statusBar()->showMessage(QStringLiteral("正在导入光碟目录与文本信息…"));
     m_initialImportResult = m_discImportService.initialImport();
     m_project = m_initialImportResult.project;
@@ -1938,7 +2008,7 @@ void MainWindow::refreshFromCurrentDriveState() {
 
     if (m_pendingAutoDiscAnalysis && m_discAnalysisWidget != nullptr) {
         m_pendingAutoDiscAnalysis = false;
-        m_discAnalysisWidget->analyzeCurrentDisc();
+        m_discAnalysisWidget->analyzeCurrentDisc(cdmanager::application::import::DiscAnalysisDepth::Deep);
     }
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QSet>
 #include <QWidget>
 
 #include "cdmanager/application/ProjectOverview.h"
@@ -17,6 +18,7 @@ public:
 
     void setTracks(const QVector<cdmanager::application::TrackOverviewRow>& tracks);
     void setLanguage(cdmanager::presentation::ui::UiLanguage language);
+    void setSuspiciousTracks(const QSet<int>& trackNumbers);
 
 signals:
     void trackDoubleClicked(int trackNumber);
@@ -27,6 +29,7 @@ private:
     cdmanager::presentation::ui::UiLanguage m_language {
         cdmanager::presentation::ui::UiLanguage::Chinese
     };
+    QSet<int> m_suspiciousTracks;
     QTableWidget* m_table {nullptr};
 };
 

@@ -9,12 +9,18 @@
 
 namespace cdmanager::application::import {
 
+enum class DiscAnalysisDepth {
+    Safe,
+    Deep,
+};
+
 struct DiscAnalysisProbePoint {
     QString label;
     int lsn {0};
     bool attempted {false};
     bool ok {false};
     bool allZero {false};
+    bool inferred {false};
     QString error;
 };
 
@@ -32,6 +38,12 @@ struct DiscAnalysisTrackLayout {
     int lengthSectors {0};
 };
 
+struct DiscAnalysisRegionMarker {
+    double startRatio {0.0};
+    double endRatio {0.0};
+    QString reason;
+};
+
 struct DiscAnalysisResult {
     bool liveMode {true};
     QString source;
@@ -43,6 +55,8 @@ struct DiscAnalysisResult {
     bool drutilCdTextAvailable {false};
     bool cdrdaoAvailable {false};
     bool looksHealthy {false};
+    bool performedDeepAnalysis {false};
+    bool confirmedTrackBoundaryFailure {false};
     QString mediaType;
     QString mediumType;
     QString devicePath;
@@ -57,6 +71,8 @@ struct DiscAnalysisResult {
     QVector<cdmanager::domain::project::Track> tracks;
     QVector<DiscAnalysisTrackLayout> cdrdaoTracks;
     QVector<DiscAnalysisTrackProbe> audioProbeResults;
+    QVector<DiscAnalysisRegionMarker> regionMarkers;
+    int firstBadTrackNumber {0};
     QStringList findings;
     QStringList suspiciousReasons;
     QString textReport;
@@ -65,7 +81,10 @@ struct DiscAnalysisResult {
 
 class DiscAnalysisService {
 public:
-    DiscAnalysisResult analyzeLiveDisc(const QString& requestedDriveId = {}) const;
+    DiscAnalysisResult analyzeLiveDisc(
+        const QString& requestedDriveId = {},
+        DiscAnalysisDepth depth = DiscAnalysisDepth::Deep
+    ) const;
     DiscAnalysisResult analyzeSampleDir(const QString& sampleDirPath) const;
 };
 

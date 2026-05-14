@@ -40,6 +40,7 @@ public:
 
 signals:
     void playbackFinished();
+    void errorOccurred(const QString& message);
 
 private slots:
     void feedAudio();

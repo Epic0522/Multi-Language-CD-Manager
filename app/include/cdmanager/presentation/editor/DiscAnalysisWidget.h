@@ -25,11 +25,15 @@ public:
     void setLanguage(cdmanager::presentation::ui::UiLanguage language);
     void setCurrentDriveId(const QString& driveId);
     void setReferenceProject(const cdmanager::domain::project::CdProject& project);
-    void analyzeCurrentDisc();
+    void analyzeCurrentDisc(
+        cdmanager::application::import::DiscAnalysisDepth depth =
+            cdmanager::application::import::DiscAnalysisDepth::Deep
+    );
+    const cdmanager::application::import::DiscAnalysisResult& lastResult() const;
 
 signals:
     void analysisStarted();
-    void analysisFinished(bool healthy);
+    void analysisFinished(bool healthy, bool performedDeepAnalysis);
 
 private:
     void retranslateUi();
