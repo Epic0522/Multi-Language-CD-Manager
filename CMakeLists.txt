@@ -196,6 +196,11 @@ qt_add_executable(cdmanager
 
 set_target_properties(cdmanager PROPERTIES
     OUTPUT_NAME "MultiLanguageCDManager"
+    MACOSX_BUNDLE TRUE
+    MACOSX_BUNDLE_BUNDLE_NAME "MultiLanguageCDManager"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.epicreds.MultiLanguageCDManager"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
 )
 
 target_include_directories(cdmanager

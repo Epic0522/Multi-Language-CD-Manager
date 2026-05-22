@@ -10,13 +10,14 @@
 ## Current Status
 
 - 项目目标是跨平台；当前仓库里的 GUI、设备接入和刻录实验主要先在 **macOS** 上实现与验证。
+- **macOS 版本现在已经可用**：可以完成光盘导入、项目编辑、播放、结构分析，以及实验性刻录流程的启动与验证。
 - 已验证当前这套日文文本链路可以生成 **W789J 可识别** 的 CD-TEXT。
 - 仍在继续收敛与已知成功样本之间的低层差异，尤其是 `W770J` 的兼容性。
 
 如果你只想快速开始：
 
 1. 先按下面的编译步骤构建项目。
-2. 先运行 `MultiLanguageCDManager`，确认 GUI 可以正常启动。
+2. 先启动 `MultiLanguageCDManager.app` 或可执行文件，确认 GUI 可以正常启动。
 3. 再运行 `ctest --test-dir build --output-on-failure`，确认当前构建通过回归测试。
 
 ## Features
@@ -43,7 +44,7 @@
 
 ### Platform status
 
-- **macOS:** current primary development and validation target
+- **macOS:** current primary development target, with a usable GUI build and active burn-analysis workflow
 - **Windows / Linux:** planned, but not implemented to the same level yet
 
 ### Optional libraries
@@ -83,20 +84,62 @@ cmake -S . -B build -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"
 
 ## Build
 
+### macOS step-by-step
+
+1. Install dependencies:
+
+```bash
+brew install cmake qt cdrdao cdrtools libcdio ffmpeg
+```
+
+2. Configure the project:
+
+```bash
+cmake -S . -B build -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"
+```
+
+If Qt is already discoverable in your environment, the shorter form also works:
+
 ```bash
 cmake -S . -B build
+```
+
+3. Build the app and tools:
+
+```bash
 cmake --build build -j4
+```
+
+4. Launch the macOS app bundle:
+
+```bash
+open build/MultiLanguageCDManager.app
+```
+
+5. Optional: run the regression tests:
+
+```bash
+ctest --test-dir build --output-on-failure
 ```
 
 Generated binaries:
 
-- `build/MultiLanguageCDManager`
+- `build/MultiLanguageCDManager.app`
+- `build/MultiLanguageCDManager.app/Contents/MacOS/MultiLanguageCDManager`
 - `build/cdtext-diff`
 - `build/cdtext-disc-recording-check` (Apple-only helper)
 
 ## Run
 
 ### GUI app
+
+Preferred on macOS:
+
+```bash
+open build/MultiLanguageCDManager.app
+```
+
+You can also run the executable directly:
 
 ```bash
 ./build/MultiLanguageCDManager
